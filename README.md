@@ -1,6 +1,10 @@
 LuPng
 =====
-A small PNG decoder/encoder lib extracted from my game engine, Lunacy.
+A small PNG decoder/encoder lib extracted from my game engine, Lunacy. It was designed for minimal state overhead and to exclusively use read/write callbacks to make it easier to use PNG data from various sources.
+
+TODO
+----
+- Get rid of hardcoded stdout error reporting
 
 Usage
 -----
@@ -18,8 +22,7 @@ With zlib:
 
 With miniz:
   - add lupng.c and miniz.c to your project
-  - ???
-  - profit
+  - add a miniz header to your include path (there is one provided in the miniz/ directory)
   - Example: `cc example.c lupng.c miniz/miniz.c -Iminiz/`
 
 License
