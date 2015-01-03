@@ -22,6 +22,10 @@
  * SOFTWARE.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #pragma once
 #include <stdint.h>
 
@@ -68,3 +72,7 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr);
  * @param img the LuImage to encode
  */
 int luPngWrite(PngWriteProc writeProc, void *userPtr, LuImage *img);
+
+#ifdef __cplusplus
+}
+#endif
