@@ -12,7 +12,7 @@ See example.c
 
 Building
 --------
-LuPng uses the zlib API for compression and decompression. For convenience this repo also contains miniz, a public domain, implementation of the deflate algorithm that exposes the zlib API. However if your project already uses zlib you can tell LuPng to use it too.
+LuPng uses the zlib API for compression and decompression. For convenience this repo also contains miniz, a public domain implementation of the deflate algorithm that exposes the zlib API. However if your project already uses zlib you can tell LuPng to use that instead.
 
 With zlib:
   - add lupng.c to your project
