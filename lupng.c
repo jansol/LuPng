@@ -320,6 +320,11 @@ static inline uint8_t dePaeth(PngInfoStruct *info, uint8_t filtered)
                         prior(info, info->currentByte-info->bytesPerPixel));
 }
 
+static inline uint8_t none(PngInfoStruct *info)
+{
+    return raw(info, info->currentByte);
+}
+
 static inline uint8_t sub(PngInfoStruct *info)
 {
     return raw(info, info->currentByte) - raw(info, info->currentByte-info->bytesPerPixel);
@@ -847,16 +852,37 @@ static inline int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
     return PNG_OK;
 }
 
-#define SCANLINE_FILTER( f, i ) \
-{ \
-    curSum = 0;\
-    filterCandidate[0] = i;\
-    for (info->currentByte = 0; info->currentByte < info->scanlineBytes; ++info->currentByte)\
-    {\
-        uint8_t val = f;\
-        filterCandidate[info->currentByte+1] = val;\
-        curSum += val;\
-    }\
+static inline void advanceBytep(PngInfoStruct *info, int is16bit)
+{
+    if (is16bit)
+    {
+        if (info->currentByte%2)
+            --info->currentByte;
+        else
+            info->currentByte+=3;
+    }
+    else
+        ++info->currentByte;
+}
+
+static inline size_t filterScanline(PngInfoStruct *info,
+                                    uint8_t(*f)(PngInfoStruct *info),
+                                    uint8_t filter,
+                                    uint8_t *filterCandidate,
+                                    int is16bit)
+{
+    size_t curSum = 0;
+    filterCandidate[0] = filter;
+    size_t fc;
+    for (info->currentByte = is16bit ? 1 : 0, fc = 1;
+        info->currentByte < info->scanlineBytes; ++fc, advanceBytep(info, is16bit) )
+    {
+        uint8_t val = f(info);
+        filterCandidate[fc] = val;
+        curSum += val;
+    }
+
+    return curSum;
 }
 
 /*
@@ -871,6 +897,7 @@ static inline int processPixels(PngInfoStruct *info)
     uint8_t *bestCandidate = (uint8_t *)malloc(info->scanlineBytes+1);
     size_t minSum = (size_t)-1, curSum = 0;
     int status = Z_OK;
+    int is16bit = info->img->depth == 16;
 
     if (!filterCandidate || !bestCandidate)
     {
@@ -913,23 +940,23 @@ static inline int processPixels(PngInfoStruct *info)
             switch (info->currentFilter)
             {
                 case PNG_FILTER_NONE:
-                    SCANLINE_FILTER(info->img->data[info->currentRow*info->scanlineBytes+info->currentByte], PNG_FILTER_NONE)
+                    curSum = filterScanline(info, none, PNG_FILTER_NONE, filterCandidate, is16bit);
                     break;
 
                 case PNG_FILTER_SUB:
-                    SCANLINE_FILTER(sub(info), PNG_FILTER_SUB)
+                    curSum = filterScanline(info, sub, PNG_FILTER_SUB, filterCandidate, is16bit);
                     break;
 
                 case PNG_FILTER_UP:
-                    SCANLINE_FILTER(up(info), PNG_FILTER_UP)
+                    curSum = filterScanline(info, up, PNG_FILTER_UP, filterCandidate, is16bit);
                     break;
 
                 case PNG_FILTER_AVERAGE:
-                    SCANLINE_FILTER(average(info), PNG_FILTER_AVERAGE)
+                    curSum = filterScanline(info, average, PNG_FILTER_AVERAGE, filterCandidate, is16bit);
                     break;
 
                 case PNG_FILTER_PAETH:
-                    SCANLINE_FILTER(paeth(info), PNG_FILTER_PAETH)
+                    curSum = filterScanline(info, paeth, PNG_FILTER_PAETH, filterCandidate, is16bit);
                     break;
 
                 default:
