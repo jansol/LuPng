@@ -33,7 +33,7 @@ typedef struct {
     int32_t width;
     int32_t height;
     uint8_t channels;
-    uint8_t depth; // must be 8 or 16
+    uint8_t depth; /* must be 8 or 16 */
     size_t dataSize;
     uint8_t *data;
 } LuImage;
@@ -59,8 +59,10 @@ void luImageRelease(LuImage *img);
  * @param readProc a function pointer to a user-defined function to use for
  * reading the PNG data.
  * @param userPtr an opaque pointer provided as an argument to readProc
+ * @param skipSig don't verify PNG signature - the bytes have already been
+ * removed from the input stream
  */
-LuImage *luPngRead(PngReadProc readProc, void *userPtr);
+LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig);
 
 /**
  * Encodes a LuImage struct to PNG and writes it out using a user-defined write

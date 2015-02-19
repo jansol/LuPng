@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     }
 
     f = fopen(argv[1], "rb");
-    img = luPngRead(myFread, f);
+    img = luPngRead(myFread, f, 0);
     fclose(f);
     if (img)
     {

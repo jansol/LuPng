@@ -160,8 +160,8 @@ typedef struct {
     int8_t chunksFound;
 
     /* IHDR info */
-    uint32_t width;
-    uint32_t height;
+    int32_t width;
+    int32_t height;
     uint8_t depth;
     uint8_t colorType;
     uint8_t channels;
@@ -395,6 +395,12 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
                    (unsigned int)info->colorType);
             return PNG_ERROR;
             break;
+    }
+
+    if (info->width <= 0 || info->height <= 0)
+    {
+        printf("PNG: illegal dimensions\n");
+        return PNG_ERROR;
     }
 
     if ((info->colorType != PNG_GRAYSCALE && info->colorType != PNG_PALETTED &&
@@ -739,20 +745,24 @@ static inline int handleChunk(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-LuImage *luPngRead(PngReadProc readProc, void *userPtr)
+LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
 {
-    PngInfoStruct info =
-    {
-        userPtr,
-        readProc,
-        0,
-        PNG_NONE
-    };
+
     uint8_t signature[PNG_SIG_SIZE];
     int status = PNG_ERROR;
 
-    info.readProc((void *)signature, 1, PNG_SIG_SIZE, userPtr);
-    if (bytesEqual(signature, PNG_SIG, PNG_SIG_SIZE))
+    PngInfoStruct info;
+    memset(&info, 0, sizeof(PngInfoStruct));
+    info.userPtr = userPtr;
+    info.readProc = readProc;
+
+    if (!skipSig)
+    {
+        info.readProc((void *)signature, 1, PNG_SIG_SIZE, userPtr);
+        status = bytesEqual(signature, PNG_SIG, PNG_SIG_SIZE) ? PNG_OK : PNG_ERROR;
+    }
+
+    if (status == PNG_OK)
     {
         PngChunk *chunk;
         while ((chunk = readChunk(&info)))
@@ -803,7 +813,7 @@ static inline int writeIhdr(PngInfoStruct *info)
     }
 
     c.length = swap32(13);
-    c.type = buf; // 4 (type) + 4 + 4 + 5x1
+    c.type = buf; /* 4 (type) + 4 + 4 + 5x1 */
     c.data = c.type + 4;
 
     memcpy((void *)c.type, (void *)"IHDR", 4);
@@ -811,9 +821,9 @@ static inline int writeIhdr(PngInfoStruct *info)
     *(uint32_t *)(c.data + 4) = swap32((uint32_t)info->img->height);
     *(c.data + 8)  = info->img->depth;
     *(c.data + 9)  = colorType[info->img->channels-1];
-    *(c.data + 10) = 0; // compression method
-    *(c.data + 11) = 0; // filter method
-    *(c.data + 12) = 0; // interlace method: none
+    *(c.data + 10) = 0; /* compression method */
+    *(c.data + 11) = 0; /* filter method */
+    *(c.data + 12) = 0; /* interlace method: none */
 
     c.crc = swap32(crc(c.type, 17));
 
@@ -975,7 +985,7 @@ static inline int processPixels(PngInfoStruct *info)
         info->stream.avail_in = info->scanlineBytes+1;
         info->stream.next_in = bestCandidate;
 
-        // compress bestCandidate
+        /* compress bestCandidate */
         do
         {
             status = deflate(&info->stream, flush);
@@ -988,7 +998,6 @@ static inline int processPixels(PngInfoStruct *info)
             }
         } while ((flush == Z_FINISH && status != Z_STREAM_END)
                     || (flush == Z_NO_FLUSH && info->stream.avail_in));
-        // TODO: fix loop conditions, apparently data gets truncated
     }
 
     return PNG_OK;
@@ -1015,13 +1024,10 @@ static inline int writeIend(PngInfoStruct *info)
 
 int luPngWrite(PngWriteProc writeProc, void *userPtr, LuImage *img)
 {
-    PngInfoStruct info = {
-        userPtr,
-        0,
-        writeProc,
-        PNG_NONE
-    };
-
+    PngInfoStruct info;
+    memset(&info, 0, sizeof(PngInfoStruct));
+    info.userPtr = userPtr;
+    info.writeProc = writeProc;
     info.img = img;
     info.bytesPerPixel = (info.img->channels * info.img->depth) >> 3;
 
