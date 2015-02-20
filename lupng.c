@@ -215,11 +215,11 @@ static const int colIncrement[] = { 1, 8, 8, 4, 4, 2, 2, 1 };
  * Helper functions
  ********************************************************/
 
-static inline void releaseChunk(PngChunk *chunk)
+static inline void releaseChunk(PngChunk *chunk, const LuUserContext *userCtx)
 {
     /* Only release chunk->type since chunk->data points to the same memory. */
-    free((void *)chunk->type);
-    free((void *)chunk);
+    userCtx->freeProc(chunk->type, userCtx->freeProcUserPtr);
+    userCtx->freeProc(chunk, userCtx->freeProcUserPtr);
 }
 
 static inline uint32_t swap32(uint32_t n)
@@ -730,14 +730,14 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
     if (read != 1)
     {
         LUPNG_WARN(info, "PNG: read error");
-        releaseChunk(chunk);
+        releaseChunk(chunk, info->userCtx);
         return 0;
     }
 
     if (crc(chunk->type, chunk->length+4) != chunk->crc)
     {
         LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\'", (char *)chunk->type);
-        releaseChunk(chunk);
+        releaseChunk(chunk, info->userCtx);
         return 0;
     }
 
@@ -793,7 +793,7 @@ LuImage *luPngReadUC(const LuUserContext *userCtx)
         while ((chunk = readChunk(&info)))
         {
             status = handleChunk(&info, chunk);
-            releaseChunk(chunk);
+            releaseChunk(chunk, info.userCtx);
 
             if (status != PNG_OK)
                 break;
@@ -802,12 +802,9 @@ LuImage *luPngReadUC(const LuUserContext *userCtx)
     else
         LUPNG_WARN(&info, "PNG: invalid header");
 
-    if (info.currentScanline)
-        free((void *)info.currentScanline);
-    if (info.previousScanline)
-        free((void *)info.previousScanline);
-    if (info.palette)
-        free((void *)info.palette);
+    userCtx->freeProc(info.currentScanline, userCtx->freeProcUserPtr);
+    userCtx->freeProc(info.previousScanline, userCtx->freeProcUserPtr);
+    userCtx->freeProc(info.palette, userCtx->freeProcUserPtr);
     inflateEnd(&info.stream);
 
     if (status == PNG_DONE)
@@ -954,8 +951,8 @@ static inline int processPixels(PngInfoStruct *info)
     if(deflateInit(&(info->stream), info->userCtx->compressionLevel) != Z_OK)
     {
         LUPNG_WARN(info, "PNG: deflateInit failed!");
-        free(filterCandidate);
-        free(bestCandidate);
+        info->userCtx->freeProc(filterCandidate, info->userCtx->freeProcUserPtr);
+        info->userCtx->freeProc(bestCandidate, info->userCtx->freeProcUserPtr);
         return PNG_ERROR;
     }
 
