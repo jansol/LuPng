@@ -196,7 +196,7 @@ typedef struct {
 } PngInfoStruct;
 
 /* helper macro to output warning via user context of the info struct */
-#define LUPNG_WARN_UC(uc,...) (uc)->warnProc((uc)->warnProcUserPtr, __VA_ARGS__)
+#define LUPNG_WARN_UC(uc,...) do { if ((uc)->warnProc) { (uc)->warnProc((uc)->warnProcUserPtr, __VA_ARGS__); }} while(0)
 #define LUPNG_WARN(info,...) LUPNG_WARN_UC((info)->userCtx, __VA_ARGS__)
 
 /* PNG header: */

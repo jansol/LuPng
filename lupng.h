@@ -62,7 +62,7 @@ typedef struct {
     void *freeProcUserPtr;
 
     /* warnings/error output */
-    PngWarnProc warnProc;
+    PngWarnProc warnProc; /* set to NULL to disable output altogether */
     void *warnProcUserPtr;
 } LuUserContext;
 
