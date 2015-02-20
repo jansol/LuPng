@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #ifndef LUPNG_USE_ZLIB
 #include <miniz.h>
@@ -194,6 +195,10 @@ typedef struct {
     const LuImage *cimg; /* constant pointer version */
 } PngInfoStruct;
 
+/* helper macro to output warning via user context of the info struct */
+#define LUPNG_WARN_UC(uc,...) (uc)->warnProc((uc)->warnProcUserPtr, __VA_ARGS__)
+#define LUPNG_WARN(info,...) LUPNG_WARN_UC((info)->userCtx, __VA_ARGS__)
+
 /* PNG header: */
 static const uint8_t PNG_SIG[] =
 /*        P     N     G    \r    \n   SUB    \n   */
@@ -266,6 +271,16 @@ static void internalFree(void *ptr, void *userPtr)
     free(ptr);
 }
 
+static void internalPrintf(void *userPtr, const char *fmt, ...)
+{
+    FILE *outStream = (FILE*)userPtr;
+    va_list args;
+
+    va_start(args, fmt);
+    vfprintf(outStream, fmt, args);
+    va_end(args);
+    fputc('\n', outStream);
+}
 
 /********************************************************
  * Png filter functions
@@ -370,7 +385,7 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
 {
     if (info->chunksFound)
     {
-        printf("PNG: malformed PNG file!\n");
+        LUPNG_WARN(info,"PNG: malformed PNG file!");
         return PNG_ERROR;
     }
 
@@ -401,15 +416,15 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
             info->channels = 4;
             break;
         default:
-            printf("PNG: illegal color type: %i\n",
-                   (unsigned int)info->colorType);
+            LUPNG_WARN(info,"PNG: illegal color type: %u",
+                       (unsigned int)info->colorType);
             return PNG_ERROR;
             break;
     }
 
     if (info->width <= 0 || info->height <= 0)
     {
-        printf("PNG: illegal dimensions\n");
+        LUPNG_WARN(info, "PNG: illegal dimensions");
         return PNG_ERROR;
     }
 
@@ -418,28 +433,28 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
         (info->colorType == PNG_PALETTED && info->depth == 16) ||
         info->depth > 16)
     {
-        printf("PNG: illegal bit depth for color type\n");
+        LUPNG_WARN(info, "PNG: illegal bit depth for color typn");
         return PNG_ERROR;
     }
 
     if (info->compression)
     {
-        printf("PNG: unknown compression method: %i\n",
-               (unsigned int)info->compression);
+        LUPNG_WARN(info,"PNG: unknown compression method: %u",
+                   (unsigned int)info->compression);
         return PNG_ERROR;
     }
 
     if (info->filter)
     {
-        printf("PNG: unknown filter scheme: %i\n",
-               (unsigned int)info->filter);
+        LUPNG_WARN(info,"PNG: unknown filter scheme: %u",
+                   (unsigned int)info->filter);
         return PNG_ERROR;
     }
 
     memset(&(info->stream), 0, sizeof(info->stream));
     if(inflateInit(&(info->stream)) != Z_OK)
     {
-        printf("PNG: inflateInit failed!\n");
+        LUPNG_WARN(info, "PNG: inflateInit failed!");
         return PNG_ERROR;
     }
     info->img = luImageCreate(info->width, info->height,
@@ -453,7 +468,7 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
     info->bytesPerPixel = MAX((info->channels * info->depth) >> 3, 1);
     if (!info->img || !info->currentScanline || !info->previousScanline)
     {
-        printf("PNG: memory allocation failed!\n");
+        LUPNG_WARN(info, "PNG: memory allocation failed!");
         return PNG_ERROR;
     }
 
@@ -464,7 +479,7 @@ static inline int parsePlte(PngInfoStruct *info, PngChunk *chunk)
 {
     if (info->chunksFound & PNG_IDAT || !(info->chunksFound & PNG_IHDR))
     {
-        printf("PNG: malformed PNG file!\n");
+        LUPNG_WARN(info, "PNG: malformed PNG file!");
         return PNG_ERROR;
     }
 
@@ -472,7 +487,7 @@ static inline int parsePlte(PngInfoStruct *info, PngChunk *chunk)
 
     if (chunk->length % 3 != 0)
     {
-        printf("PNG: invalid palette size!\n");
+        LUPNG_WARN(info, "PNG: invalid palette size!");
         return PNG_ERROR;
     }
 
@@ -480,7 +495,7 @@ static inline int parsePlte(PngInfoStruct *info, PngChunk *chunk)
     info->palette = (uint8_t *)info->userCtx->allocProc(chunk->length,info->userCtx->allocProcUserPtr);
     if (!info->palette)
     {
-        printf("PNG: memory allocation failed!\n");
+        LUPNG_WARN(info, "PNG: memory allocation failed!");
         return PNG_ERROR;
     }
     memcpy(info->palette, chunk->data, chunk->length);
@@ -569,7 +584,7 @@ static inline int insertByte(PngInfoStruct *info, uint8_t byte)
         }
         else
         {
-            printf("PNG: invalid palette index encountered!\n");
+            LUPNG_WARN(info,"PNG: invalid palette index encountered!");
         }
         advance = 1;
     }
@@ -611,13 +626,13 @@ static inline int parseIdat(PngInfoStruct *info, PngChunk *chunk)
 
     if (!(info->chunksFound & PNG_IHDR))
     {
-        printf("PNG: malformed PNG file!\n");
+        LUPNG_WARN(info,"PNG: malformed PNG file!");
         return PNG_ERROR;
     }
 
     if (info->colorType == PNG_PALETTED && !(info->chunksFound & PNG_PLTE))
     {
-        printf("PNG: palette required but missing!\n");
+        LUPNG_WARN(info,"PNG: palette required but missing!");
         return PNG_ERROR;
     }
 
@@ -637,7 +652,7 @@ static inline int parseIdat(PngInfoStruct *info, PngChunk *chunk)
             status != Z_BUF_ERROR &&
             status != Z_NEED_DICT)
         {
-            printf("PNG: inflate error!\n");
+            LUPNG_WARN(info, "PNG: inflate error!");
             return PNG_ERROR;
         }
 
@@ -699,7 +714,7 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
     size_t read = 0;
     if (!chunk)
     {
-        printf("PNG: memory allocation failed!\n");
+        LUPNG_WARN(info,"PNG: memory allocation failed!");
         return 0;
     }
 
@@ -714,14 +729,14 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
 
     if (read != 1)
     {
-        printf("PNG: read error\n");
+        LUPNG_WARN(info, "PNG: read error");
         releaseChunk(chunk);
         return 0;
     }
 
     if (crc(chunk->type, chunk->length+4) != chunk->crc)
     {
-        printf("PNG: CRC mismatch in \'%.4s\'\n", (char *)chunk->type);
+        LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\'", (char *)chunk->type);
         releaseChunk(chunk);
         return 0;
     }
@@ -745,7 +760,7 @@ static inline int handleChunk(PngInfoStruct *info, PngChunk *chunk)
             info->chunksFound |= PNG_IEND;
             if (!(info->chunksFound & PNG_IDAT))
             {
-                printf("PNG: no IDAT chunk found\n");
+                LUPNG_WARN(info, "PNG: no IDAT chunk found");
                 return PNG_ERROR;
             }
             return PNG_DONE;
@@ -785,7 +800,7 @@ LuImage *luPngReadUC(const LuUserContext *userCtx)
         }
     }
     else
-        printf("PNG: invalid header\n");
+        LUPNG_WARN(&info, "PNG: invalid header");
 
     if (info.currentScanline)
         free((void *)info.currentScanline);
@@ -829,7 +844,7 @@ static inline int writeIhdr(PngInfoStruct *info)
 
     if (info->cimg->channels > 4)
     {
-        printf("PNG: too many channels in image\n");
+        LUPNG_WARN(info, "PNG: too many channels in image");
         return PNG_ERROR;
     }
 
@@ -855,7 +870,7 @@ static inline int writeIhdr(PngInfoStruct *info)
 
     if (written != 25)
     {
-        printf("PNG: write error\n");
+        LUPNG_WARN(info, "PNG: write error");
         return PNG_ERROR;
     }
 
@@ -876,7 +891,7 @@ static inline int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
 
     if (written != buflen+8)
     {
-        printf("PNG: write error\n");
+        LUPNG_WARN(info, "PNG: write error");
         return PNG_ERROR;
     }
     
@@ -932,13 +947,13 @@ static inline int processPixels(PngInfoStruct *info)
 
     if (!filterCandidate || !bestCandidate)
     {
-        printf("PNG: memory allocation failed!\n");
+        LUPNG_WARN(info, "PNG: memory allocation failed!");
     }
 
     memset(&(info->stream), 0, sizeof(info->stream));
     if(deflateInit(&(info->stream), info->userCtx->compressionLevel) != Z_OK)
     {
-        printf("PNG: deflateInit failed!\n");
+        LUPNG_WARN(info, "PNG: deflateInit failed!");
         free(filterCandidate);
         free(bestCandidate);
         return PNG_ERROR;
@@ -1036,7 +1051,7 @@ static inline int writeIend(PngInfoStruct *info)
 
     if (written != 12)
     {
-        printf("PNG: write error\n");
+        LUPNG_WARN(info, "PNG: write error");
         return PNG_ERROR;
     }
 
@@ -1053,7 +1068,7 @@ int luPngWriteUC(const LuUserContext *userCtx, const LuImage *img)
 
     if (info.userCtx->writeProc((void *)PNG_SIG, 1, PNG_SIG_SIZE, info.userCtx->writeProcUserPtr) != PNG_SIG_SIZE)
     {
-        printf("PNG: write error\n");
+        LUPNG_WARN(&info, "PNG: write error");
         return PNG_ERROR;
     }
 
@@ -1093,7 +1108,7 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
 
     if (depth != 8 && depth != 16)
     {
-        printf("Image: only bit depths 8 and 16 are supported!\n");
+        LUPNG_WARN_UC(userCtx,"Image: only bit depths 8 and 16 are supported!");
         return NULL;
     }
 
@@ -1131,4 +1146,7 @@ void luUserContextInitDefault(LuUserContext *userCtx)
     userCtx->allocProcUserPtr=NULL;
     userCtx->freeProc=internalFree;
     userCtx->freeProcUserPtr=NULL;
+
+    userCtx->warnProc=internalPrintf;
+    userCtx->warnProcUserPtr=(void*)stderr;
 }

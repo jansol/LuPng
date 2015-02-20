@@ -42,6 +42,7 @@ typedef size_t (*PngReadProc)(void *outPtr, size_t size, size_t count, void *use
 typedef size_t (*PngWriteProc)(const void *inPtr, size_t size, size_t count, void *userPtr);
 typedef void*  (*PngAllocProc)(size_t size, void *userPtr);
 typedef void   (*PngFreeProc)(void *ptr, void *userPtr);
+typedef void   (*PngWarnProc)(void *userPtr, const char *fmt, ...);
 
 typedef struct {
     /* loader */
@@ -59,6 +60,10 @@ typedef struct {
     void *allocProcUserPtr;
     PngFreeProc freeProc;
     void *freeProcUserPtr;
+
+    /* warnings/error output */
+    PngWarnProc warnProc;
+    void *warnProcUserPtr;
 } LuUserContext;
 
 /**
