@@ -936,7 +936,7 @@ static inline int processPixels(PngInfoStruct *info)
     }
 
     memset(&(info->stream), 0, sizeof(info->stream));
-    if(deflateInit(&(info->stream), Z_DEFAULT_COMPRESSION) != Z_OK)
+    if(deflateInit(&(info->stream), info->userCtx->compressionLevel) != Z_OK)
     {
         printf("PNG: deflateInit failed!\n");
         free(filterCandidate);
@@ -1125,10 +1125,10 @@ void luUserContextInitDefault(LuUserContext *userCtx)
 
     userCtx->writeProc=NULL;
     userCtx->writeProcUserPtr=NULL;
+    userCtx->compressionLevel=Z_DEFAULT_COMPRESSION;
 
     userCtx->allocProc=internalMalloc;
     userCtx->allocProcUserPtr=NULL;
-
     userCtx->freeProc=internalFree;
     userCtx->freeProcUserPtr=NULL;
 }

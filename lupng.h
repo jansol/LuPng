@@ -44,16 +44,19 @@ typedef void*  (*PngAllocProc)(size_t size, void *userPtr);
 typedef void   (*PngFreeProc)(void *ptr, void *userPtr);
 
 typedef struct {
+    /* loader */
     PngReadProc readProc;
     void *readProcUserPtr;
     int skipSig;
 
+    /* writer */
     PngWriteProc writeProc;
     void *writeProcUserPtr;
+    int compressionLevel;
 
+    /* memory allocation */
     PngAllocProc allocProc;
     void *allocProcUserPtr;
-
     PngFreeProc freeProc;
     void *freeProcUserPtr;
 } LuUserContext;
