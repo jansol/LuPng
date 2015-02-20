@@ -86,6 +86,18 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
 void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
 
 /**
+ * Extracts the raw image buffer form a LuImage. The image will not reference
+ * this buffer any more and should be destroyed via luImageRelease().
+ */
+uint8_t *luImageExtractBuf(LuImage *img);
+
+/**
+ * Extracts the raw image buffer form a LuImage and releases the orphaned
+ * LuImage object.
+ */
+uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx);
+
+/**
  * Decodes a PNG image with the provided read function into a LuImage struct
  *
  * @param readProc a function pointer to a user-defined function to use for

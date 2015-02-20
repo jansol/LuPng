@@ -1132,6 +1132,28 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
     return img;
 }
 
+uint8_t *luImageExtractBuf(LuImage *img)
+{
+    uint8_t *data;
+    if (img) {
+        data = img->data;
+	img->data = NULL;
+    } else {
+        data = NULL;
+    }
+    return data;
+}
+
+uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx)
+{
+    uint8_t *data=luImageExtractBuf(img);
+
+    if (img)
+        luImageRelease(img, userCtx);
+
+    return data;
+}
+
 void luUserContextInitDefault(LuUserContext *userCtx)
 {
     userCtx->readProc=NULL;
