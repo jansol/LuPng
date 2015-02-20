@@ -154,9 +154,7 @@ typedef struct
 } PngChunk;
 
 typedef struct {
-    void *userPtr;
-    PngReadProc readProc;
-    PngWriteProc writeProc;
+    const LuUserContext *userCtx;
     int8_t chunksFound;
 
     /* IHDR info */
@@ -193,6 +191,7 @@ typedef struct {
 
     /* the output image */
     LuImage *img;
+    const LuImage *cimg; /* constant pointer version */
 } PngInfoStruct;
 
 /* PNG header: */
@@ -255,6 +254,17 @@ static int bytesEqual(const uint8_t *a, const uint8_t *b, size_t count)
     return 1;
 }
 
+static void* internalMalloc(size_t size, void *userPtr)
+{
+    (void)userPtr; /* not used */
+    return malloc(size);
+}
+
+static void internalFree(void *ptr, void *userPtr)
+{
+    (void)userPtr; /* not used */
+    free(ptr);
+}
 
 
 /********************************************************
@@ -433,10 +443,11 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
         return PNG_ERROR;
     }
     info->img = luImageCreate(info->width, info->height,
-                              info->channels, info->depth < 16 ? 8 : 16);
+                              info->channels, info->depth < 16 ? 8 : 16, info->userCtx);
+    info->cimg = info->img;
     info->scanlineBytes = MAX((info->width * info->channels * info->depth) >> 3, 1);
-    info->currentScanline = (uint8_t *)malloc(info->scanlineBytes);
-    info->previousScanline = (uint8_t *)malloc(info->scanlineBytes);
+    info->currentScanline = (uint8_t *)info->userCtx->allocProc(info->scanlineBytes, info->userCtx->allocProcUserPtr);
+    info->previousScanline = (uint8_t *)info->userCtx->allocProc(info->scanlineBytes, info->userCtx->allocProcUserPtr);
     info->currentCol = -1;
     info->interlacePass = info->interlace ? 1 : 0;
     info->bytesPerPixel = MAX((info->channels * info->depth) >> 3, 1);
@@ -466,7 +477,7 @@ static inline int parsePlte(PngInfoStruct *info, PngChunk *chunk)
     }
 
     info->paletteItems = chunk->length/3;
-    info->palette = (uint8_t *)malloc(chunk->length);
+    info->palette = (uint8_t *)info->userCtx->allocProc(chunk->length,info->userCtx->allocProcUserPtr);
     if (!info->palette)
     {
         printf("PNG: memory allocation failed!\n");
@@ -517,10 +528,10 @@ static inline int insertByte(PngInfoStruct *info, uint8_t byte)
     if (info->colorType != PNG_PALETTED)
     {
         if (info->depth == 8)
-            info->img->data[idx] = byte;
+            info->cimg->data[idx] = byte;
 
         else if (info->depth < 8)
-            info->img->data[idx] = byte * scale[info->depth];
+            info->cimg->data[idx] = byte * scale[info->depth];
 
         else /* depth == 16 */
         {
@@ -531,7 +542,7 @@ static inline int insertByte(PngInfoStruct *info, uint8_t byte)
                 val = swap16(val);
                 info->tmpCount = 0;
 
-                ((uint16_t *)(info->img->data))[idx] = val;
+                ((uint16_t *)(info->cimg->data))[idx] = val;
             }
             else
             {
@@ -552,9 +563,9 @@ static inline int insertByte(PngInfoStruct *info, uint8_t byte)
         /* The spec limits palette size to 256 entries */
         if (byte < info->paletteItems)
         {
-            info->img->data[idx  ] = info->palette[3*byte  ];
-            info->img->data[idx+1] = info->palette[3*byte+1];
-            info->img->data[idx+2] = info->palette[3*byte+2];
+            info->cimg->data[idx  ] = info->palette[3*byte  ];
+            info->cimg->data[idx+1] = info->palette[3*byte+1];
+            info->cimg->data[idx+2] = info->palette[3*byte+2];
         }
         else
         {
@@ -684,7 +695,7 @@ static inline int parseIdat(PngInfoStruct *info, PngChunk *chunk)
 
 static inline PngChunk *readChunk(PngInfoStruct *info)
 {
-    PngChunk *chunk = (PngChunk *)malloc(sizeof(PngChunk));
+    PngChunk *chunk = (PngChunk *)info->userCtx->allocProc(sizeof(PngChunk),info->userCtx->allocProcUserPtr);
     size_t read = 0;
     if (!chunk)
     {
@@ -692,13 +703,13 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
         return 0;
     }
 
-    info->readProc((void *)&chunk->length, 4, 1, info->userPtr);
+    info->userCtx->readProc((void *)&chunk->length, 4, 1, info->userCtx->readProcUserPtr);
     chunk->length = swap32(chunk->length);
-    chunk->type = (uint8_t *)malloc(chunk->length + 4);
+    chunk->type = (uint8_t *)info->userCtx->allocProc(chunk->length + 4, info->userCtx->allocProcUserPtr);
     chunk->data = chunk->type + 4;
 
-    info->readProc((void *)chunk->type, 1, chunk->length + 4, info->userPtr);
-    read = info->readProc((void *)&chunk->crc, 4, 1, info->userPtr);
+    info->userCtx->readProc((void *)chunk->type, 1, chunk->length + 4, info->userCtx->readProcUserPtr);
+    read = info->userCtx->readProc((void *)&chunk->crc, 4, 1, info->userCtx->readProcUserPtr);
     chunk->crc = swap32(chunk->crc);
 
     if (read != 1)
@@ -745,7 +756,7 @@ static inline int handleChunk(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
+LuImage *luPngReadUC(const LuUserContext *userCtx, int skipSig)
 {
 
     uint8_t signature[PNG_SIG_SIZE];
@@ -753,12 +764,11 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
 
     PngInfoStruct info;
     memset(&info, 0, sizeof(PngInfoStruct));
-    info.userPtr = userPtr;
-    info.readProc = readProc;
+    info.userCtx = userCtx;
 
     if (!skipSig)
     {
-        info.readProc((void *)signature, 1, PNG_SIG_SIZE, userPtr);
+        info.userCtx->readProc((void *)signature, 1, PNG_SIG_SIZE, info.userCtx->readProcUserPtr);
         status = bytesEqual(signature, PNG_SIG, PNG_SIG_SIZE) ? PNG_OK : PNG_ERROR;
     }
 
@@ -789,9 +799,19 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
         return info.img;
     else
         if (info.img)
-            luImageRelease(info.img);
+            luImageRelease(info.img, info.userCtx);
 
-    return 0;
+    return NULL;
+}
+
+LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
+{
+    LuUserContext userCtx;
+
+    luUserContextInitDefault(&userCtx);
+    userCtx.readProc = readProc;
+    userCtx.readProcUserPtr = userPtr;
+    return luPngReadUC(&userCtx, skipSig);
 }
 
 static inline int writeIhdr(PngInfoStruct *info)
@@ -806,7 +826,7 @@ static inline int writeIhdr(PngInfoStruct *info)
     size_t written = 0;
     PngChunk c;
 
-    if (info->img->channels > 4)
+    if (info->cimg->channels > 4)
     {
         printf("PNG: too many channels in image\n");
         return PNG_ERROR;
@@ -817,20 +837,20 @@ static inline int writeIhdr(PngInfoStruct *info)
     c.data = c.type + 4;
 
     memcpy((void *)c.type, (void *)"IHDR", 4);
-    *(uint32_t *)(c.data)     = swap32((uint32_t)info->img->width);
-    *(uint32_t *)(c.data + 4) = swap32((uint32_t)info->img->height);
-    *(c.data + 8)  = info->img->depth;
-    *(c.data + 9)  = colorType[info->img->channels-1];
+    *(uint32_t *)(c.data)     = swap32((uint32_t)info->cimg->width);
+    *(uint32_t *)(c.data + 4) = swap32((uint32_t)info->cimg->height);
+    *(c.data + 8)  = info->cimg->depth;
+    *(c.data + 9)  = colorType[info->cimg->channels-1];
     *(c.data + 10) = 0; /* compression method */
     *(c.data + 11) = 0; /* filter method */
     *(c.data + 12) = 0; /* interlace method: none */
 
     c.crc = swap32(crc(c.type, 17));
 
-    written += info->writeProc((void *)&c.length, 4, 1, info->userPtr) * 4;
-    written += info->writeProc((void *)c.type, 1, 4, info->userPtr);
-    written += info->writeProc((void *)c.data, 1, 13, info->userPtr);
-    written += info->writeProc((void *)&c.crc, 4, 1, info->userPtr) * 4;
+    written += info->userCtx->writeProc((void *)&c.length, 4, 1, info->userCtx->writeProcUserPtr) * 4;
+    written += info->userCtx->writeProc((void *)c.type, 1, 4, info->userCtx->writeProcUserPtr);
+    written += info->userCtx->writeProc((void *)c.data, 1, 13, info->userCtx->writeProcUserPtr);
+    written += info->userCtx->writeProc((void *)&c.crc, 4, 1, info->userCtx->writeProcUserPtr) * 4;
 
     if (written != 25)
     {
@@ -849,9 +869,9 @@ static inline int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
     c.length = swap32(buflen-4);
     c.crc = swap32(crc(buf, buflen));
 
-    written += info->writeProc((void *)&c.length, 4, 1, info->userPtr) * 4;
-    written += info->writeProc((void *)buf, 1, buflen, info->userPtr);
-    written += info->writeProc((void *)&c.crc, 4, 1, info->userPtr) * 4;
+    written += info->userCtx->writeProc((void *)&c.length, 4, 1, info->userCtx->writeProcUserPtr) * 4;
+    written += info->userCtx->writeProc((void *)buf, 1, buflen, info->userCtx->writeProcUserPtr);
+    written += info->userCtx->writeProc((void *)&c.crc, 4, 1, info->userCtx->writeProcUserPtr) * 4;
 
     if (written != buflen+8)
     {
@@ -903,11 +923,11 @@ static inline int processPixels(PngInfoStruct *info)
 {
     uint8_t idatBuf[BUF_SIZE+4] = {'I', 'D', 'A', 'T'};
     uint8_t *compressed = idatBuf+4;
-    uint8_t *filterCandidate = (uint8_t *)malloc(info->scanlineBytes+1);
-    uint8_t *bestCandidate = (uint8_t *)malloc(info->scanlineBytes+1);
+    uint8_t *filterCandidate = (uint8_t *)info->userCtx->allocProc(info->scanlineBytes+1, info->userCtx->allocProcUserPtr);
+    uint8_t *bestCandidate = (uint8_t *)info->userCtx->allocProc(info->scanlineBytes+1, info->userCtx->allocProcUserPtr);
     size_t minSum = (size_t)-1, curSum = 0;
     int status = Z_OK;
-    int is16bit = info->img->depth == 16;
+    int is16bit = info->cimg->depth == 16;
 
     if (!filterCandidate || !bestCandidate)
     {
@@ -926,10 +946,10 @@ static inline int processPixels(PngInfoStruct *info)
     info->stream.avail_out = BUF_SIZE;
     info->stream.next_out = compressed;
 
-    for (info->currentRow = 0; info->currentRow < info->img->height;
+    for (info->currentRow = 0; info->currentRow < info->cimg->height;
          ++info->currentRow)
     {
-        int flush = (info->currentRow < info->img->height-1) ?
+        int flush = (info->currentRow < info->cimg->height-1) ?
         Z_NO_FLUSH : Z_FINISH;
         minSum = (size_t)-1;
 
@@ -938,7 +958,7 @@ static inline int processPixels(PngInfoStruct *info)
          * scanline when processing row 0. And next time it'll be valid.
          */
         info->previousScanline = info->currentScanline;
-        info->currentScanline = info->img->data + (info->currentRow*info->scanlineBytes);
+        info->currentScanline = info->cimg->data + (info->currentRow*info->scanlineBytes);
 
         /*
          * Try to choose the best filter for each scanline.
@@ -1009,9 +1029,9 @@ static inline int writeIend(PngInfoStruct *info)
     size_t written = 0;
     c.crc = swap32(crc(c.type, 4));
 
-    written += info->writeProc((void *)&c.length, 4, 1, info->userPtr) * 4;
-    written += info->writeProc((void *)c.type, 1, 4, info->userPtr);
-    written += info->writeProc((void *)&c.crc, 4, 1, info->userPtr) * 4;
+    written += info->userCtx->writeProc((void *)&c.length, 4, 1, info->userCtx->writeProcUserPtr) * 4;
+    written += info->userCtx->writeProc((void *)c.type, 1, 4, info->userCtx->writeProcUserPtr);
+    written += info->userCtx->writeProc((void *)&c.crc, 4, 1, info->userCtx->writeProcUserPtr) * 4;
 
     if (written != 12)
     {
@@ -1022,16 +1042,15 @@ static inline int writeIend(PngInfoStruct *info)
     return PNG_OK;
 }
 
-int luPngWrite(PngWriteProc writeProc, void *userPtr, LuImage *img)
+int luPngWriteUC(const LuUserContext *userCtx, const LuImage *img)
 {
     PngInfoStruct info;
     memset(&info, 0, sizeof(PngInfoStruct));
-    info.userPtr = userPtr;
-    info.writeProc = writeProc;
-    info.img = img;
-    info.bytesPerPixel = (info.img->channels * info.img->depth) >> 3;
+    info.userCtx = userCtx;
+    info.cimg = img;
+    info.bytesPerPixel = (info.cimg->channels * info.cimg->depth) >> 3;
 
-    if (writeProc((void *)PNG_SIG, 1, PNG_SIG_SIZE, userPtr) != PNG_SIG_SIZE)
+    if (info.userCtx->writeProc((void *)PNG_SIG, 1, PNG_SIG_SIZE, info.userCtx->writeProcUserPtr) != PNG_SIG_SIZE)
     {
         printf("PNG: write error\n");
         return PNG_ERROR;
@@ -1050,34 +1069,61 @@ int luPngWrite(PngWriteProc writeProc, void *userPtr, LuImage *img)
     deflateEnd(&(info.stream));
     return writeIend(&info);
 }
-
-
-void luImageRelease(LuImage *img)
+int luPngWrite(PngWriteProc writeProc, void *userPtr, const LuImage *img)
 {
-    free((void *)img->data);
-    free((void *)img);
+    LuUserContext userCtx;
+
+    luUserContextInitDefault(&userCtx);
+    userCtx.writeProc = writeProc;
+    userCtx.writeProcUserPtr = userPtr;
+    return luPngWriteUC(&userCtx, img);
 }
 
-LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth)
+
+void luImageRelease(LuImage *img, const LuUserContext *userCtx)
+{
+    userCtx->freeProc(img->data, userCtx->freeProcUserPtr);
+    userCtx->freeProc(img, userCtx->freeProcUserPtr);
+}
+
+LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth, const LuUserContext *userCtx)
 {
     LuImage *img;
 
     if (depth != 8 && depth != 16)
     {
         printf("Image: only bit depths 8 and 16 are supported!\n");
-        return 0;
+        return NULL;
     }
 
-    img = (LuImage *)malloc(sizeof(LuImage));
+    img = (LuImage *)userCtx->allocProc(sizeof(LuImage), userCtx->allocProcUserPtr);
     if (!img)
-        return 0;
+        return NULL;
 
     img->width = width;
     img->height = height;
     img->channels = channels;
     img->depth = depth;
     img->dataSize = (size_t)((depth >> 3) * width * height * channels);
-    img->data = (uint8_t *)malloc(img->dataSize);
+    img->data = (uint8_t *)userCtx->allocProc(img->dataSize, userCtx->allocProcUserPtr);
+
+    if (img->data == NULL)
+    {
+        luImageRelease(img, userCtx);
+        return NULL;
+    }
 
     return img;
+}
+
+void luUserContextInitDefault(LuUserContext *userCtx)
+{
+    userCtx->readProc=NULL;
+    userCtx->readProcUserPtr=NULL;
+    userCtx->writeProc=NULL;
+    userCtx->writeProcUserPtr=NULL;
+    userCtx->allocProc=internalMalloc;
+    userCtx->allocProcUserPtr=NULL;
+    userCtx->freeProc=internalFree;
+    userCtx->freeProcUserPtr=NULL;
 }

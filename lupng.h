@@ -40,18 +40,41 @@ typedef struct {
 
 typedef size_t (*PngReadProc)(void *outPtr, size_t size, size_t count, void *userPtr);
 typedef size_t (*PngWriteProc)(const void *inPtr, size_t size, size_t count, void *userPtr);
+typedef void*  (*PngAllocProc)(size_t size, void *userPtr);
+typedef void   (*PngFreeProc)(void *ptr, void *userPtr);
+
+typedef struct {
+    PngReadProc readProc;
+    void *readProcUserPtr;
+
+    PngWriteProc writeProc;
+    void *writeProcUserPtr;
+
+    PngAllocProc allocProc;
+    void *allocProcUserPtr;
+
+    PngFreeProc freeProc;
+    void *freeProcUserPtr;
+} LuUserContext;
+
+/**
+ * Initializes a LuUserContext to use the defaul malloc implementation.
+ *
+ * @param userCtx the LuUserContext to initialize
+ */
+void luUserContextInitDefault(LuUserContext *userCtx);
 
 /**
  * Creates a new Image object with the specified attributes.
  * The data store of the Image is allocated but its contents are undefined.
  * Only 8 and 16 bits deep images with 1-4 channels are supported.
  */
-LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth);
+LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth, const LuUserContext *usrCtx);
 
 /**
  * Releases the memory associated with the given Image object.
  */
-void luImageRelease(LuImage *img);
+void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
 
 /**
  * Decodes a PNG image with the provided read function into a LuImage struct
@@ -65,6 +88,15 @@ void luImageRelease(LuImage *img);
 LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig);
 
 /**
+ * Decodes a PNG image with the provided user context into a LuImage struct
+ *
+ * @param userCtx the LuUserContext to use
+ * @param skipSig don't verify PNG signature - the bytes have already been
+ * removed from the input stream
+ */
+LuImage *luPngReadUC(const LuUserContext *userCtx, int skipSig);
+
+/**
  * Encodes a LuImage struct to PNG and writes it out using a user-defined write
  * function.
  *
@@ -73,7 +105,16 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig);
  * @param userPtr an opaque pointer provided as an argument to writeProc
  * @param img the LuImage to encode
  */
-int luPngWrite(PngWriteProc writeProc, void *userPtr, LuImage *img);
+int luPngWrite(PngWriteProc writeProc, void *userPtr, const LuImage *img);
+
+/**
+ * Encodes a LuImage struct to PNG and writes it out with the provided user
+ * context.
+ *
+ * @param userCtx the LuUserContext to use
+ * @param img the LuImage to encode
+ */
+int luPngWriteUC(const LuUserContext *userCtx, const LuImage *img);
 
 #ifdef __cplusplus
 }
