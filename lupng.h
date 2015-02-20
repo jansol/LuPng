@@ -46,6 +46,7 @@ typedef void   (*PngFreeProc)(void *ptr, void *userPtr);
 typedef struct {
     PngReadProc readProc;
     void *readProcUserPtr;
+    int skipSig;
 
     PngWriteProc writeProc;
     void *writeProcUserPtr;
@@ -91,10 +92,8 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig);
  * Decodes a PNG image with the provided user context into a LuImage struct
  *
  * @param userCtx the LuUserContext to use
- * @param skipSig don't verify PNG signature - the bytes have already been
- * removed from the input stream
  */
-LuImage *luPngReadUC(const LuUserContext *userCtx, int skipSig);
+LuImage *luPngReadUC(const LuUserContext *userCtx);
 
 /**
  * Encodes a LuImage struct to PNG and writes it out using a user-defined write

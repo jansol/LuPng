@@ -756,7 +756,7 @@ static inline int handleChunk(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-LuImage *luPngReadUC(const LuUserContext *userCtx, int skipSig)
+LuImage *luPngReadUC(const LuUserContext *userCtx)
 {
 
     uint8_t signature[PNG_SIG_SIZE];
@@ -766,7 +766,7 @@ LuImage *luPngReadUC(const LuUserContext *userCtx, int skipSig)
     memset(&info, 0, sizeof(PngInfoStruct));
     info.userCtx = userCtx;
 
-    if (!skipSig)
+    if (!userCtx->skipSig)
     {
         info.userCtx->readProc((void *)signature, 1, PNG_SIG_SIZE, info.userCtx->readProcUserPtr);
         status = bytesEqual(signature, PNG_SIG, PNG_SIG_SIZE) ? PNG_OK : PNG_ERROR;
@@ -811,7 +811,8 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
     luUserContextInitDefault(&userCtx);
     userCtx.readProc = readProc;
     userCtx.readProcUserPtr = userPtr;
-    return luPngReadUC(&userCtx, skipSig);
+    userCtx.skipSig = skipSig;
+    return luPngReadUC(&userCtx);
 }
 
 static inline int writeIhdr(PngInfoStruct *info)
@@ -1120,10 +1121,14 @@ void luUserContextInitDefault(LuUserContext *userCtx)
 {
     userCtx->readProc=NULL;
     userCtx->readProcUserPtr=NULL;
+    userCtx->skipSig = 0;
+
     userCtx->writeProc=NULL;
     userCtx->writeProcUserPtr=NULL;
+
     userCtx->allocProc=internalMalloc;
     userCtx->allocProcUserPtr=NULL;
+
     userCtx->freeProc=internalFree;
     userCtx->freeProcUserPtr=NULL;
 }
