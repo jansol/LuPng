@@ -2,10 +2,6 @@ LuPng
 =====
 A small PNG decoder/encoder lib extracted from my game engine, Lunacy. It was designed for minimal state overhead and to exclusively use read/write callbacks to make it easier to use PNG data from various sources.
 
-TODO
-----
-- Get rid of hardcoded stdout error reporting
-
 Usage
 -----
 See example.c

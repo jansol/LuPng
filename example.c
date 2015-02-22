@@ -8,21 +8,9 @@
  * new file.
  */
 
-
-static size_t myFread(void *ptr, size_t size, size_t count, void *userPtr)
-{
-    return fread(ptr, size, count, (FILE *)userPtr);
-}
-
-static size_t myFwrite(const void *ptr, size_t size, size_t count, void *userPtr)
-{
-    return fwrite(ptr, size, count, (FILE *)userPtr);
-}
-
 int main(int argc, char **argv)
 {
     LuImage *img;
-    FILE *f;
     int ret = 1;
 
     if (argc < 3)
@@ -32,15 +20,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    f = fopen(argv[1], "rb");
-    img = luPngRead(myFread, f, 0);
-    fclose(f);
+    img = luPngReadFile(argv[1]);
     if (img)
     {
-        f = fopen(argv[2], "wb");
-        ret = luPngWrite(myFwrite, f, img);
-        fclose(f);
-        return ret;
+        ret = luPngWriteFile(argv[2], img);
+        luImageRelease(img, NULL);
     }
 
     return ret;
