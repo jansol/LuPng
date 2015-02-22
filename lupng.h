@@ -93,6 +93,13 @@ void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
 uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx);
 
 /**
+ * Decodes a PNG image from a file
+ *
+ * @param filename the file name (optionally with full path) to read from.
+ */
+LuImage *luPngReadFile(const char *filename);
+
+/**
  * Decodes a PNG image with the provided read function into a LuImage struct
  *
  * @param readProc a function pointer to a user-defined function to use for
@@ -109,6 +116,15 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig);
  * @param userCtx the LuUserContext to use
  */
 LuImage *luPngReadUC(const LuUserContext *userCtx);
+
+/**
+ * Encodes a LuImage struct to PNG and writes it out to a file.
+ *
+ * @param filename the file name (optionally with full path) to write to.
+ *                 Existing files will be overwritten!
+ * @param img the LuImage to encode
+ */
+int luPngWriteFile(const char *filename, const LuImage *img);
 
 /**
  * Encodes a LuImage struct to PNG and writes it out using a user-defined write

@@ -282,6 +282,16 @@ static void internalPrintf(void *userPtr, const char *fmt, ...)
     fputc('\n', outStream);
 }
 
+static size_t internalFread(void *ptr, size_t size, size_t count, void *userPtr)
+{
+    return fread(ptr, size, count, (FILE *)userPtr);
+}
+
+static size_t internalFwrite(const void *ptr, size_t size, size_t count, void *userPtr)
+{
+    return fwrite(ptr, size, count, (FILE *)userPtr);
+}
+
 /********************************************************
  * Png filter functions
  ********************************************************/
@@ -827,6 +837,26 @@ LuImage *luPngRead(PngReadProc readProc, void *userPtr, int skipSig)
     return luPngReadUC(&userCtx);
 }
 
+LuImage *luPngReadFile(const char *filename)
+{
+    LuUserContext userCtx;
+    LuImage *img;
+    FILE *f = fopen(filename,"rb");
+
+    luUserContextInitDefault(&userCtx);
+    if (f) {
+        userCtx.readProc = internalFread;
+        userCtx.readProcUserPtr = f;
+        img = luPngReadUC(&userCtx);
+        fclose(f);
+    } else {
+        LUPNG_WARN_UC(&userCtx, "PNG: failed to open '%s'", filename);
+        img=NULL;
+    }
+
+    return img;
+}
+
 static inline int writeIhdr(PngInfoStruct *info)
 {
     static uint8_t buf[17];
@@ -1082,6 +1112,7 @@ int luPngWriteUC(const LuUserContext *userCtx, const LuImage *img)
     deflateEnd(&(info.stream));
     return writeIend(&info);
 }
+
 int luPngWrite(PngWriteProc writeProc, void *userPtr, const LuImage *img)
 {
     LuUserContext userCtx;
@@ -1092,6 +1123,29 @@ int luPngWrite(PngWriteProc writeProc, void *userPtr, const LuImage *img)
     return luPngWriteUC(&userCtx, img);
 }
 
+int luPngWriteFile(const char *filename, const LuImage *img)
+{
+    LuUserContext userCtx;
+    FILE *f;
+
+    if (!img) {
+        return PNG_ERROR;
+    }
+
+    f = fopen(filename,"wb");
+    luUserContextInitDefault(&userCtx);
+    if (f) {
+        userCtx.writeProc = internalFwrite;
+	userCtx.writeProcUserPtr = f;
+        luPngWriteUC(&userCtx, img);
+        fclose(f);
+    } else {
+        LUPNG_WARN_UC(&userCtx, "PNG: failed to open '%s'", filename);
+        return PNG_ERROR;
+    }
+
+    return PNG_OK;
+}
 
 void luImageRelease(LuImage *img, const LuUserContext *userCtx)
 {
