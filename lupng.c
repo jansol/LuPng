@@ -715,7 +715,7 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
     if (!chunk)
     {
         LUPNG_WARN(info,"PNG: memory allocation failed!");
-        return 0;
+        return NULL;
     }
 
     info->userCtx->readProc((void *)&chunk->length, 4, 1, info->userCtx->readProcUserPtr);
@@ -731,14 +731,14 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
     {
         LUPNG_WARN(info, "PNG: read error");
         releaseChunk(chunk, info->userCtx);
-        return 0;
+        return NULL;
     }
 
     if (crc(chunk->type, chunk->length+4) != chunk->crc)
     {
         LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\'", (char *)chunk->type);
         releaseChunk(chunk, info->userCtx);
-        return 0;
+        return NULL;
     }
 
     return chunk;
