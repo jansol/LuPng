@@ -77,11 +77,20 @@ void luUserContextInitDefault(LuUserContext *userCtx);
  * Creates a new Image object with the specified attributes.
  * The data store of the Image is allocated but its contents are undefined.
  * Only 8 and 16 bits deep images with 1-4 channels are supported.
+ *
+ * @param userCtx the user context (with the memory allocator function
+ *                pointers to use), or NULL to use the default allocator
+ *                (malloc).
  */
 LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth, const LuUserContext *usrCtx);
 
 /**
  * Releases the memory associated with the given Image object.
+ *
+ * @param userCtx the user context (with the memory deallocator function
+ *                pointers to use), or NULL to use the default deallocator
+ *                (free). The deallocator should match the ones used for
+ *                allocation.
  */
 void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
 
@@ -89,6 +98,11 @@ void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
  * Extracts the raw image buffer form a LuImage and releases the 
  * then-orphaned LuImage object. This can be used if you want to use
  * the image data in your own structures.
+ *
+ * @param userCtx the user context (with the memory deallocator function
+ *                pointers to use), or NULL to use the default deallocator
+ *                (free). The deallocator should match the ones used for
+ *                allocation.
  */
 uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx);
 

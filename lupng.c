@@ -1149,6 +1149,13 @@ int luPngWriteFile(const char *filename, const LuImage *img)
 
 void luImageRelease(LuImage *img, const LuUserContext *userCtx)
 {
+    LuUserContext ucDefault;
+
+    if (userCtx == NULL) {
+        luUserContextInitDefault(&ucDefault);
+	userCtx = &ucDefault;
+    }
+
     userCtx->freeProc(img->data, userCtx->freeProcUserPtr);
     userCtx->freeProc(img, userCtx->freeProcUserPtr);
 }
@@ -1156,6 +1163,12 @@ void luImageRelease(LuImage *img, const LuUserContext *userCtx)
 LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth, const LuUserContext *userCtx)
 {
     LuImage *img;
+    LuUserContext ucDefault;
+
+    if (userCtx == NULL) {
+        luUserContextInitDefault(&ucDefault);
+	userCtx = &ucDefault;
+    }
 
     if (depth != 8 && depth != 16)
     {
@@ -1183,21 +1196,16 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
     return img;
 }
 
-uint8_t *luImageExtractBuf(LuImage *img)
-{
-    uint8_t *data;
-    if (img) {
-        data = img->data;
-	img->data = NULL;
-    } else {
-        data = NULL;
-    }
-    return data;
-}
-
 uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx)
 {
     uint8_t *data;
+    LuUserContext ucDefault;
+
+    if (userCtx == NULL) {
+        luUserContextInitDefault(&ucDefault);
+	userCtx = &ucDefault;
+    }
+
     if (img) {
         data = img->data;
 	img->data = NULL;

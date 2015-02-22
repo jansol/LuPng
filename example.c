@@ -24,6 +24,7 @@ int main(int argc, char **argv)
     if (img)
     {
         ret = luPngWriteFile(argv[2], img);
+        luImageRelease(img, NULL);
     }
 
     return ret;
