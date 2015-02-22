@@ -86,14 +86,9 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
 void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
 
 /**
- * Extracts the raw image buffer form a LuImage. The image will not reference
- * this buffer any more and should be destroyed via luImageRelease().
- */
-uint8_t *luImageExtractBuf(LuImage *img);
-
-/**
- * Extracts the raw image buffer form a LuImage and releases the orphaned
- * LuImage object.
+ * Extracts the raw image buffer form a LuImage and releases the 
+ * then-orphaned LuImage object. This can be used if you want to use
+ * the image data in your own structures.
  */
 uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx);
 

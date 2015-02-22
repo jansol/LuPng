@@ -1143,10 +1143,14 @@ uint8_t *luImageExtractBuf(LuImage *img)
 
 uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx)
 {
-    uint8_t *data=luImageExtractBuf(img);
-
-    if (img)
+    uint8_t *data;
+    if (img) {
+        data = img->data;
+	img->data = NULL;
         luImageRelease(img, userCtx);
+    } else {
+        data = NULL;
+    }
 
     return data;
 }
