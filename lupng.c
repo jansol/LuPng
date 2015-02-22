@@ -433,7 +433,7 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
         (info->colorType == PNG_PALETTED && info->depth == 16) ||
         info->depth > 16)
     {
-        LUPNG_WARN(info, "PNG: illegal bit depth for color typn");
+        LUPNG_WARN(info, "PNG: illegal bit depth for color type");
         return PNG_ERROR;
     }
 
