@@ -129,10 +129,10 @@ static const uint32_t crcTable[] =
  is the 1's complement of the final running CRC (see the
  crc() routine below)). */
 static uint32_t updateCrc(uint32_t crc, unsigned char *buf,
-                          int len)
+                          size_t len)
 {
-    unsigned long c = crc;
-    int n;
+    uint32_t c = crc;
+    size_t n;
 
     for (n = 0; n < len; n++)
         c = crcTable[(c ^ buf[n]) & 0xFF] ^ (c >> 8);
@@ -141,7 +141,7 @@ static uint32_t updateCrc(uint32_t crc, unsigned char *buf,
 }
 
 /* Return the CRC of the bytes buf[0..len-1]. */
-static uint32_t crc(unsigned char *buf, int len)
+static uint32_t crc(unsigned char *buf, size_t len)
 {
     return updateCrc(0xFFFFFFFFL, buf, len) ^ 0xFFFFFFFFL;
 }
