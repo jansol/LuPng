@@ -69,6 +69,8 @@
 #define LU_INLINE inline /* rest of the world... */
 #endif
 
+#define SIZE_T_MAX_POSITIVE ( ((size_t)-1) >> 1 )
+
 /********************************************************
  * CRC computation as per PNG spec
  ********************************************************/
@@ -304,19 +306,20 @@ static LU_INLINE int absi(int val)
     return val > 0 ? val : -val;
 }
 
-static LU_INLINE uint8_t raw(PngInfoStruct *info, int32_t col)
+static LU_INLINE uint8_t raw(PngInfoStruct *info, size_t col)
 {
-    if (col < 0)
+    if (col > SIZE_T_MAX_POSITIVE)
         return 0;
     return info->currentScanline[col];
 }
 
-static LU_INLINE uint8_t prior(PngInfoStruct *info, int32_t col)
+static LU_INLINE uint8_t prior(PngInfoStruct *info, size_t col)
 {
-    if (info->currentRow <= startingRow[info->interlacePass] || col < 0)
+    if (info->currentRow <= startingRow[info->interlacePass] || col > SIZE_T_MAX_POSITIVE)
         return 0;
     return info->previousScanline[col];
 }
+
 
 static LU_INLINE uint8_t paethPredictor(uint8_t a, uint8_t b, uint8_t c)
 {
