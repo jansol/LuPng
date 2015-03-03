@@ -3836,7 +3836,7 @@ mz_bool mz_zip_reader_extract_to_callback(mz_zip_archive *pZip, mz_uint file_ind
       do
       {
         mz_uint8 *pWrite_buf_cur = (mz_uint8 *)pWrite_buf + (out_buf_ofs & (TINFL_LZ_DICT_SIZE - 1));
-        size_t in_buf_size, out_buf_size = TINFL_LZ_DICT_SIZE - (out_buf_ofs & (TINFL_LZ_DICT_SIZE - 1));
+        size_t in_buf_size, out_buf_size = (size_t) (TINFL_LZ_DICT_SIZE - (out_buf_ofs & (TINFL_LZ_DICT_SIZE - 1)));
         if ((!read_buf_avail) && (!pZip->m_pState->m_pMem))
         {
           read_buf_avail = MZ_MIN(read_buf_size, comp_remaining);
