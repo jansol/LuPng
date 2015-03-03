@@ -658,11 +658,13 @@ static LU_INLINE int parseIdat(PngInfoStruct *info, PngChunk *chunk)
     info->stream.avail_in = chunk->length;
     do
     {
+        size_t decompressed;
+        size_t i;
+
         info->stream.next_out = filtered;
         info->stream.avail_out = BUF_SIZE;
         status = inflate(&(info->stream), Z_NO_FLUSH);
-        size_t decompressed = BUF_SIZE - info->stream.avail_out;
-        size_t i;
+        decompressed = BUF_SIZE - info->stream.avail_out;
 
         if (status != Z_OK &&
             status != Z_STREAM_END &&
@@ -952,8 +954,9 @@ static LU_INLINE size_t filterScanline(PngInfoStruct *info,
                                     int is16bit)
 {
     size_t curSum = 0;
-    filterCandidate[0] = filter;
     size_t fc;
+
+    filterCandidate[0] = filter;
     for (info->currentByte = is16bit ? 1 : 0, fc = 1;
         info->currentByte < info->scanlineBytes; ++fc, advanceBytep(info, is16bit) )
     {
