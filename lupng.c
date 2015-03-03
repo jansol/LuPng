@@ -918,7 +918,7 @@ static LU_INLINE int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
     size_t written = 0;
     PngChunk c;
 
-    c.length = swap32(buflen-4);
+    c.length = swap32((uint32_t)(buflen-4));
     c.crc = swap32(crc(buf, buflen));
 
     written += info->userCtx->writeProc((void *)&c.length, 4, 1, info->userCtx->writeProcUserPtr) * 4;
@@ -1055,7 +1055,7 @@ static LU_INLINE int processPixels(PngInfoStruct *info)
             }
         }
 
-        info->stream.avail_in = info->scanlineBytes+1;
+        info->stream.avail_in = (unsigned int)info->scanlineBytes+1;
         info->stream.next_in = bestCandidate;
 
         /* compress bestCandidate */
@@ -1185,13 +1185,17 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
         LUPNG_WARN_UC(userCtx,"Image: only bit depths 8 and 16 are supported!");
         return NULL;
     }
+    if (width > 0x7FFFFFFF || height > 0x7FFFFFFF) {
+        LUPNG_WARN_UC(userCtx, "Image: only 32 bit signed image dimensions are supported!");
+        return NULL;
+    }
 
     img = (LuImage *)userCtx->allocProc(sizeof(LuImage), userCtx->allocProcUserPtr);
     if (!img)
         return NULL;
 
-    img->width = width;
-    img->height = height;
+    img->width = (int32_t)width;
+    img->height = (int32_t)height;
     img->channels = channels;
     img->depth = depth;
     img->dataSize = (size_t)((depth >> 3) * width * height * channels);
