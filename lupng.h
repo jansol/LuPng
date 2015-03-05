@@ -78,11 +78,14 @@ void luUserContextInitDefault(LuUserContext *userCtx);
  * The data store of the Image is allocated but its contents are undefined.
  * Only 8 and 16 bits deep images with 1-4 channels are supported.
  *
+ * @param buffer pointer to an existing buffer (which may already contain the
+ *               image data), or NULL to internally allocate a new buffer
  * @param userCtx the user context (with the memory allocator function
  *                pointers to use), or NULL to use the default allocator
  *                (malloc).
  */
-LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth, const LuUserContext *usrCtx);
+LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth,
+                       uint8_t *buffer, const LuUserContext *usrCtx);
 
 /**
  * Releases the memory associated with the given Image object.

@@ -468,7 +468,7 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
         return PNG_ERROR;
     }
     info->img = luImageCreate(info->width, info->height,
-                              info->channels, info->depth < 16 ? 8 : 16, info->userCtx);
+                              info->channels, info->depth < 16 ? 8 : 16, NULL, info->userCtx);
     info->cimg = info->img;
     info->scanlineBytes = MAX((info->width * info->channels * info->depth) >> 3, 1);
     info->currentScanline = (uint8_t *)info->userCtx->allocProc(info->scanlineBytes, info->userCtx->allocProcUserPtr);
@@ -1160,7 +1160,8 @@ void luImageRelease(LuImage *img, const LuUserContext *userCtx)
     userCtx->freeProc(img, userCtx->freeProcUserPtr);
 }
 
-LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth, const LuUserContext *userCtx)
+LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth,
+                       uint8_t *buffer, const LuUserContext *userCtx)
 {
     LuImage *img;
     LuUserContext ucDefault;
@@ -1185,7 +1186,10 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
     img->channels = channels;
     img->depth = depth;
     img->dataSize = (size_t)((depth >> 3) * width * height * channels);
-    img->data = (uint8_t *)userCtx->allocProc(img->dataSize, userCtx->allocProcUserPtr);
+    if (buffer)
+        img->data = buffer;
+    else
+        img->data = (uint8_t *)userCtx->allocProc(img->dataSize, userCtx->allocProcUserPtr);
 
     if (img->data == NULL)
     {
