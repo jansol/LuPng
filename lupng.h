@@ -64,6 +64,10 @@ typedef struct {
     /* warnings/error output */
     PngWarnProc warnProc; /* set to NULL to disable output altogether */
     void *warnProcUserPtr;
+
+    /* special case: avoid allocating a LuImage when loading or creating
+     * an image, just use this one */
+    LuImage *overrideImage;
 } LuUserContext;
 
 /**

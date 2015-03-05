@@ -1157,7 +1157,8 @@ void luImageRelease(LuImage *img, const LuUserContext *userCtx)
     }
 
     userCtx->freeProc(img->data, userCtx->freeProcUserPtr);
-    userCtx->freeProc(img, userCtx->freeProcUserPtr);
+    if (userCtx->overrideImage != img)
+        userCtx->freeProc(img, userCtx->freeProcUserPtr);
 }
 
 LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth,
@@ -1177,7 +1178,10 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
         return NULL;
     }
 
-    img = (LuImage *)userCtx->allocProc(sizeof(LuImage), userCtx->allocProcUserPtr);
+    if (userCtx->overrideImage)
+        img = userCtx->overrideImage;
+    else
+        img = (LuImage *)userCtx->allocProc(sizeof(LuImage), userCtx->allocProcUserPtr);
     if (!img)
         return NULL;
 
@@ -1238,4 +1242,6 @@ void luUserContextInitDefault(LuUserContext *userCtx)
 
     userCtx->warnProc=internalPrintf;
     userCtx->warnProcUserPtr=(void*)stderr;
+
+    userCtx->overrideImage=NULL;
 }
