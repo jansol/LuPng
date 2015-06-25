@@ -1063,6 +1063,9 @@ static inline int processPixels(PngInfoStruct *info)
                     || (flush == Z_NO_FLUSH && info->stream.avail_in));
     }
 
+    info->userCtx->freeProc(filterCandidate, info->userCtx->freeProcUserPtr);
+    info->userCtx->freeProc(bestCandidate, info->userCtx->freeProcUserPtr);
+
     return PNG_OK;
 }
 
