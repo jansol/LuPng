@@ -63,7 +63,13 @@
 #define BUF_SIZE 8192
 #define MAX(x, y) (x > y ? x : y)
 
+#if defined(_MSC_VER)
+#define LU_INLINE __inline /* MS-specific inline */
+#else
+#define LU_INLINE inline /* rest of the world... */
+#endif
 
+#define SIZE_T_MAX_POSITIVE ( ((size_t)-1) >> 1 )
 
 /********************************************************
  * CRC computation as per PNG spec
@@ -123,10 +129,10 @@ static const uint32_t crcTable[] =
  is the 1's complement of the final running CRC (see the
  crc() routine below)). */
 static uint32_t updateCrc(uint32_t crc, unsigned char *buf,
-                          int len)
+                          size_t len)
 {
-    unsigned long c = crc;
-    int n;
+    uint32_t c = crc;
+    size_t n;
 
     for (n = 0; n < len; n++)
         c = crcTable[(c ^ buf[n]) & 0xFF] ^ (c >> 8);
@@ -135,7 +141,7 @@ static uint32_t updateCrc(uint32_t crc, unsigned char *buf,
 }
 
 /* Return the CRC of the bytes buf[0..len-1]. */
-static uint32_t crc(unsigned char *buf, int len)
+static uint32_t crc(unsigned char *buf, size_t len)
 {
     return updateCrc(0xFFFFFFFFL, buf, len) ^ 0xFFFFFFFFL;
 }
@@ -215,14 +221,14 @@ static const int colIncrement[] = { 1, 8, 8, 4, 4, 2, 2, 1 };
  * Helper functions
  ********************************************************/
 
-static inline void releaseChunk(PngChunk *chunk, const LuUserContext *userCtx)
+static LU_INLINE void releaseChunk(PngChunk *chunk, const LuUserContext *userCtx)
 {
     /* Only release chunk->type since chunk->data points to the same memory. */
     userCtx->freeProc(chunk->type, userCtx->freeProcUserPtr);
     userCtx->freeProc(chunk, userCtx->freeProcUserPtr);
 }
 
-static inline uint32_t swap32(uint32_t n)
+static LU_INLINE uint32_t swap32(uint32_t n)
 {
     union {
         unsigned char np[4];
@@ -236,7 +242,7 @@ static inline uint32_t swap32(uint32_t n)
     (uint32_t)u.np[3];
 }
 
-static inline uint16_t swap16(uint16_t n)
+static LU_INLINE uint16_t swap16(uint16_t n)
 {
     union {
         unsigned char np[2];
@@ -295,26 +301,27 @@ static size_t internalFwrite(const void *ptr, size_t size, size_t count, void *u
 /********************************************************
  * Png filter functions
  ********************************************************/
-static inline int absi(int val)
+static LU_INLINE int absi(int val)
 {
     return val > 0 ? val : -val;
 }
 
-static inline uint8_t raw(PngInfoStruct *info, int32_t col)
+static LU_INLINE uint8_t raw(PngInfoStruct *info, size_t col)
 {
-    if (col < 0)
+    if (col > SIZE_T_MAX_POSITIVE)
         return 0;
     return info->currentScanline[col];
 }
 
-static inline uint8_t prior(PngInfoStruct *info, int32_t col)
+static LU_INLINE uint8_t prior(PngInfoStruct *info, size_t col)
 {
-    if (info->currentRow <= startingRow[info->interlacePass] || col < 0)
+    if (info->currentRow <= startingRow[info->interlacePass] || col > SIZE_T_MAX_POSITIVE)
         return 0;
     return info->previousScanline[col];
 }
 
-static inline uint8_t paethPredictor(uint8_t a, uint8_t b, uint8_t c)
+
+static LU_INLINE uint8_t paethPredictor(uint8_t a, uint8_t b, uint8_t c)
 {
     unsigned int A = a, B = b, C = c;
     int p = (int)A + (int)B - (int)C;
@@ -329,17 +336,17 @@ static inline uint8_t paethPredictor(uint8_t a, uint8_t b, uint8_t c)
     return c;
 }
 
-static inline uint8_t deSub(PngInfoStruct *info, uint8_t filtered)
+static LU_INLINE uint8_t deSub(PngInfoStruct *info, uint8_t filtered)
 {
     return filtered + raw(info, info->currentByte-info->bytesPerPixel);
 }
 
-static inline uint8_t deUp(PngInfoStruct *info, uint8_t filtered)
+static LU_INLINE uint8_t deUp(PngInfoStruct *info, uint8_t filtered)
 {
     return filtered + prior(info, info->currentByte);
 }
 
-static inline uint8_t deAverage(PngInfoStruct *info, uint8_t filtered)
+static LU_INLINE uint8_t deAverage(PngInfoStruct *info, uint8_t filtered)
 {
     uint16_t avg = (uint16_t)(raw(info, info->currentByte-info->bytesPerPixel)
                                 + prior(info, info->currentByte));
@@ -347,7 +354,7 @@ static inline uint8_t deAverage(PngInfoStruct *info, uint8_t filtered)
     return filtered + avg;
 }
 
-static inline uint8_t dePaeth(PngInfoStruct *info, uint8_t filtered)
+static LU_INLINE uint8_t dePaeth(PngInfoStruct *info, uint8_t filtered)
 {
     return filtered + paethPredictor(
                         raw(info, info->currentByte-info->bytesPerPixel),
@@ -355,22 +362,22 @@ static inline uint8_t dePaeth(PngInfoStruct *info, uint8_t filtered)
                         prior(info, info->currentByte-info->bytesPerPixel));
 }
 
-static inline uint8_t none(PngInfoStruct *info)
+static LU_INLINE uint8_t none(PngInfoStruct *info)
 {
     return raw(info, info->currentByte);
 }
 
-static inline uint8_t sub(PngInfoStruct *info)
+static LU_INLINE uint8_t sub(PngInfoStruct *info)
 {
     return raw(info, info->currentByte) - raw(info, info->currentByte-info->bytesPerPixel);
 }
 
-static inline uint8_t up(PngInfoStruct *info)
+static LU_INLINE uint8_t up(PngInfoStruct *info)
 {
     return raw(info, info->currentByte) - prior(info, info->currentByte);
 }
 
-static inline uint8_t average(PngInfoStruct *info)
+static LU_INLINE uint8_t average(PngInfoStruct *info)
 {
     uint16_t avg = (uint16_t)(raw(info, info->currentByte-info->bytesPerPixel)
                               + prior(info, info->currentByte));
@@ -378,7 +385,7 @@ static inline uint8_t average(PngInfoStruct *info)
     return raw(info, info->currentByte) - avg;
 }
 
-static inline uint8_t paeth(PngInfoStruct *info)
+static LU_INLINE uint8_t paeth(PngInfoStruct *info)
 {
     return raw(info, info->currentByte) - paethPredictor(
                     raw(info, info->currentByte-info->bytesPerPixel),
@@ -391,7 +398,7 @@ static inline uint8_t paeth(PngInfoStruct *info)
 /********************************************************
  * Actual implementation
  ********************************************************/
-static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
+static LU_INLINE int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
 {
     if (info->chunksFound)
     {
@@ -485,7 +492,7 @@ static inline int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-static inline int parsePlte(PngInfoStruct *info, PngChunk *chunk)
+static LU_INLINE int parsePlte(PngInfoStruct *info, PngChunk *chunk)
 {
     if (info->chunksFound & PNG_IDAT || !(info->chunksFound & PNG_IHDR))
     {
@@ -513,7 +520,7 @@ static inline int parsePlte(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-static inline void stretchBits(uint8_t inByte, uint8_t outBytes[8], int depth)
+static LU_INLINE void stretchBits(uint8_t inByte, uint8_t outBytes[8], int depth)
 {
     int i;
     switch (depth) {
@@ -540,7 +547,7 @@ static inline void stretchBits(uint8_t inByte, uint8_t outBytes[8], int depth)
 }
 
 /* returns: 1 if at end of scanline, 0 otherwise */
-static inline int insertByte(PngInfoStruct *info, uint8_t byte)
+static LU_INLINE int insertByte(PngInfoStruct *info, uint8_t byte)
 {
     int advance = 0;
     const uint8_t scale[] = {0x00, 0xFF, 0x55, 0x00, 0x11, 0x00, 0x00, 0x00};
@@ -629,7 +636,7 @@ static inline int insertByte(PngInfoStruct *info, uint8_t byte)
     return 0;
 }
 
-static inline int parseIdat(PngInfoStruct *info, PngChunk *chunk)
+static LU_INLINE int parseIdat(PngInfoStruct *info, PngChunk *chunk)
 {
     unsigned char filtered[BUF_SIZE];
     int status = Z_OK;
@@ -651,11 +658,13 @@ static inline int parseIdat(PngInfoStruct *info, PngChunk *chunk)
     info->stream.avail_in = chunk->length;
     do
     {
+        size_t decompressed;
+        size_t i;
+
         info->stream.next_out = filtered;
         info->stream.avail_out = BUF_SIZE;
         status = inflate(&(info->stream), Z_NO_FLUSH);
-        size_t decompressed = BUF_SIZE - info->stream.avail_out;
-        size_t i;
+        decompressed = BUF_SIZE - info->stream.avail_out;
 
         if (status != Z_OK &&
             status != Z_STREAM_END &&
@@ -718,7 +727,7 @@ static inline int parseIdat(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-static inline PngChunk *readChunk(PngInfoStruct *info)
+static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
 {
     PngChunk *chunk = (PngChunk *)info->userCtx->allocProc(sizeof(PngChunk),info->userCtx->allocProcUserPtr);
     size_t read = 0;
@@ -754,7 +763,7 @@ static inline PngChunk *readChunk(PngInfoStruct *info)
     return chunk;
 }
 
-static inline int handleChunk(PngInfoStruct *info, PngChunk *chunk)
+static LU_INLINE int handleChunk(PngInfoStruct *info, PngChunk *chunk)
 {
     /* critical chunk */
     if (!(chunk->type[0] & 0x20))
@@ -857,7 +866,7 @@ LuImage *luPngReadFile(const char *filename)
     return img;
 }
 
-static inline int writeIhdr(PngInfoStruct *info)
+static LU_INLINE int writeIhdr(PngInfoStruct *info)
 {
     static uint8_t buf[17];
     static const uint8_t colorType[] = {
@@ -904,12 +913,12 @@ static inline int writeIhdr(PngInfoStruct *info)
     return PNG_OK;
 }
 
-static inline int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
+static LU_INLINE int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
 {
     size_t written = 0;
     PngChunk c;
 
-    c.length = swap32(buflen-4);
+    c.length = swap32((uint32_t)(buflen-4));
     c.crc = swap32(crc(buf, buflen));
 
     written += info->userCtx->writeProc((void *)&c.length, 4, 1, info->userCtx->writeProcUserPtr) * 4;
@@ -925,7 +934,7 @@ static inline int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
     return PNG_OK;
 }
 
-static inline void advanceBytep(PngInfoStruct *info, int is16bit)
+static LU_INLINE void advanceBytep(PngInfoStruct *info, int is16bit)
 {
     if (is16bit)
     {
@@ -938,15 +947,16 @@ static inline void advanceBytep(PngInfoStruct *info, int is16bit)
         ++info->currentByte;
 }
 
-static inline size_t filterScanline(PngInfoStruct *info,
+static LU_INLINE size_t filterScanline(PngInfoStruct *info,
                                     uint8_t(*f)(PngInfoStruct *info),
                                     uint8_t filter,
                                     uint8_t *filterCandidate,
                                     int is16bit)
 {
     size_t curSum = 0;
-    filterCandidate[0] = filter;
     size_t fc;
+
+    filterCandidate[0] = filter;
     for (info->currentByte = is16bit ? 1 : 0, fc = 1;
         info->currentByte < info->scanlineBytes; ++fc, advanceBytep(info, is16bit) )
     {
@@ -962,7 +972,7 @@ static inline size_t filterScanline(PngInfoStruct *info,
  * Processes the input image and calls writeIdat for every BUF_SIZE compressed
  * bytes.
  */
-static inline int processPixels(PngInfoStruct *info)
+static LU_INLINE int processPixels(PngInfoStruct *info)
 {
     uint8_t idatBuf[BUF_SIZE+4] = {'I', 'D', 'A', 'T'};
     uint8_t *compressed = idatBuf+4;
@@ -1045,7 +1055,7 @@ static inline int processPixels(PngInfoStruct *info)
             }
         }
 
-        info->stream.avail_in = info->scanlineBytes+1;
+        info->stream.avail_in = (unsigned int)info->scanlineBytes+1;
         info->stream.next_in = bestCandidate;
 
         /* compress bestCandidate */
@@ -1069,7 +1079,7 @@ static inline int processPixels(PngInfoStruct *info)
     return PNG_OK;
 }
 
-static inline int writeIend(PngInfoStruct *info)
+static LU_INLINE int writeIend(PngInfoStruct *info)
 {
     PngChunk c = { 0, (uint8_t *)"IEND", 0, 0 };
     size_t written = 0;
@@ -1180,6 +1190,10 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
         LUPNG_WARN_UC(userCtx,"Image: only bit depths 8 and 16 are supported!");
         return NULL;
     }
+    if (width > 0x7FFFFFFF || height > 0x7FFFFFFF) {
+        LUPNG_WARN_UC(userCtx, "Image: only 32 bit signed image dimensions are supported!");
+        return NULL;
+    }
 
     if (userCtx->overrideImage)
         img = userCtx->overrideImage;
@@ -1188,8 +1202,8 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
     if (!img)
         return NULL;
 
-    img->width = width;
-    img->height = height;
+    img->width = (int32_t)width;
+    img->height = (int32_t)height;
     img->channels = channels;
     img->depth = depth;
     img->dataSize = (size_t)((depth >> 3) * width * height * channels);
