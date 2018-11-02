@@ -675,7 +675,9 @@ static LU_INLINE int parseIdat(PngInfoStruct *info, PngChunk *chunk)
             return PNG_ERROR;
         }
 
-        for (i = 0; i < decompressed; ++i)
+        for (i = 0;
+            i < decompressed && info->currentCol < info->width && info->currentRow < info->height;
+            ++i)
         {
             if (info->currentCol < 0)
             {
@@ -722,7 +724,8 @@ static LU_INLINE int parseIdat(PngInfoStruct *info, PngChunk *chunk)
                     insertByte(info, rawByte);
             }
         }
-    } while ((info->stream.avail_in > 0 || info->stream.avail_out == 0));
+    } while ((info->stream.avail_in > 0 || info->stream.avail_out == 0)
+            && info->currentCol < info->width && info->currentRow < info->height);
 
     return PNG_OK;
 }
