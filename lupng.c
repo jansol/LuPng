@@ -749,6 +749,20 @@ static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
     read = info->userCtx->readProc((void *)&chunk->crc, 4, 1, info->userCtx->readProcUserPtr);
     chunk->crc = swap32(chunk->crc);
 
+    if (chunk->length+4 < chunk->length)
+    {
+        LUPNG_WARN(info, "PNG: chunk claims to be absurdly large");
+        return NULL;
+    }
+    for (int i = 0; i < 4; ++i)
+    {
+        char byte = chunk->type[i];
+        if ((byte < 'a' || byte > 'z') && (byte < 'A' || byte > 'Z'))
+        {
+            LUPNG_WARN(info, "PNG: invalid chunk name, possibly unprintable");
+            return NULL;
+        }
+    }
     if (read != 1)
     {
         LUPNG_WARN(info, "PNG: read error");
