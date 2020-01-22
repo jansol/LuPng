@@ -494,13 +494,24 @@ static LU_INLINE int parseIhdr(PngInfoStruct *info, PngChunk *chunk)
 
 static LU_INLINE int parsePlte(PngInfoStruct *info, PngChunk *chunk)
 {
+    if (info->chunksFound & PNG_PLTE)
+    {
+            LUPNG_WARN(info, "PNG: too many palette chunks in file!");
+            return PNG_ERROR;
+    }
+    info->chunksFound |= PNG_PLTE;
+
     if (info->chunksFound & PNG_IDAT || !(info->chunksFound & PNG_IHDR))
     {
         LUPNG_WARN(info, "PNG: malformed PNG file!");
         return PNG_ERROR;
     }
 
-    info->chunksFound |= PNG_PLTE;
+    if (info->colorType == PNG_GRAYSCALE || info->colorType == PNG_GRAYSCALE_ALPHA)
+    {
+        LUPNG_WARN(info, "PNG: palettes are not allowed in grayscale images!");
+        return PNG_ERROR;
+    }
 
     if (chunk->length % 3 != 0)
     {
@@ -742,6 +753,7 @@ static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
 
     info->userCtx->readProc((void *)&chunk->length, 4, 1, info->userCtx->readProcUserPtr);
     chunk->length = swap32(chunk->length);
+    // Store chunk type and contents in the same buffer for convenience
     chunk->type = (uint8_t *)info->userCtx->allocProc(chunk->length + 4, info->userCtx->allocProcUserPtr);
     chunk->data = chunk->type + 4;
 
@@ -752,6 +764,7 @@ static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
     if (chunk->length+4 < chunk->length)
     {
         LUPNG_WARN(info, "PNG: chunk claims to be absurdly large");
+        releaseChunk(chunk, info->userCtx);
         return NULL;
     }
     for (int i = 0; i < 4; ++i)
@@ -760,6 +773,7 @@ static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
         if ((byte < 'a' || byte > 'z') && (byte < 'A' || byte > 'Z'))
         {
             LUPNG_WARN(info, "PNG: invalid chunk name, possibly unprintable");
+            releaseChunk(chunk, info->userCtx);
             return NULL;
         }
     }
