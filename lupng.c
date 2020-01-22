@@ -877,7 +877,7 @@ LuImage *luPngReadFile(const char *filename)
         fclose(f);
     } else {
         LUPNG_WARN_UC(&userCtx, "PNG: failed to open '%s'", filename);
-        img=NULL;
+        img = NULL;
     }
 
     return img;
@@ -947,7 +947,7 @@ static LU_INLINE int writeIdat(PngInfoStruct *info, uint8_t *buf, size_t buflen)
         LUPNG_WARN(info, "PNG: write error");
         return PNG_ERROR;
     }
-    
+
     return PNG_OK;
 }
 
@@ -1132,7 +1132,7 @@ int luPngWriteUC(const LuUserContext *userCtx, const LuImage *img)
     if (writeIhdr(&info) != PNG_OK)
         return PNG_ERROR;
 
-    info.scanlineBytes = (img->depth >> 3) * img->channels * img->width;
+    info.scanlineBytes = (info.cimg->depth >> 3) * info.cimg->channels * info.cimg->width;
     if (processPixels(&info) != PNG_OK)
     {
         deflateEnd(&(info.stream));
@@ -1158,18 +1158,22 @@ int luPngWriteFile(const char *filename, const LuImage *img)
     LuUserContext userCtx;
     FILE *f;
 
-    if (!img) {
+    if (!img)
+    {
         return PNG_ERROR;
     }
 
     f = fopen(filename,"wb");
     luUserContextInitDefault(&userCtx);
-    if (f) {
+    if (f)
+    {
         userCtx.writeProc = internalFwrite;
-	userCtx.writeProcUserPtr = f;
+        userCtx.writeProcUserPtr = f;
         luPngWriteUC(&userCtx, img);
         fclose(f);
-    } else {
+    }
+    else
+    {
         LUPNG_WARN_UC(&userCtx, "PNG: failed to open '%s'", filename);
         return PNG_ERROR;
     }
@@ -1181,9 +1185,10 @@ void luImageRelease(LuImage *img, const LuUserContext *userCtx)
 {
     LuUserContext ucDefault;
 
-    if (userCtx == NULL) {
+    if (userCtx == NULL)
+    {
         luUserContextInitDefault(&ucDefault);
-	userCtx = &ucDefault;
+        userCtx = &ucDefault;
     }
 
     userCtx->freeProc(img->data, userCtx->freeProcUserPtr);
@@ -1245,14 +1250,17 @@ uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx)
 
     if (userCtx == NULL) {
         luUserContextInitDefault(&ucDefault);
-	userCtx = &ucDefault;
+        userCtx = &ucDefault;
     }
 
-    if (img) {
+    if (img)
+    {
         data = img->data;
-	img->data = NULL;
+        img->data = NULL;
         luImageRelease(img, userCtx);
-    } else {
+    }
+    else
+    {
         data = NULL;
     }
 

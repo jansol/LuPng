@@ -10,21 +10,21 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/miniz)
 
 set(LUPNG_SOURCES
-  lupng.c
+    lupng.c
 )
 
 if(LUPNG_USE_ZLIB)
-  find_package(ZLIB)
-  include_directories(${ZLIB_INCLUDE_DIRS})
-  add_definitions(-DLUPNG_USE_ZLIB)
-  list(APPEND LUPNG_LIBRARIES ${ZLIB_LIBRARIES})
+    find_package(ZLIB)
+    include_directories(${ZLIB_INCLUDE_DIRS})
+    add_definitions(-DLUPNG_USE_ZLIB)
+    list(APPEND LUPNG_LIBRARIES ${ZLIB_LIBRARIES})
 else(LUPNG_USE_ZLIB)
-  list(APPEND LUPNG_SOURCES miniz/miniz.c)
+    list(APPEND LUPNG_SOURCES miniz/miniz.c)
 endif(LUPNG_USE_ZLIB)
 
 add_library(LuPng STATIC ${LUPNG_SOURCES})
 
 if(LUPNG_BUILD_EXAMPLE)
-  add_executable(example example.c)
-  target_link_libraries(example ${LUPNG_LIBRARIES})
+    add_executable(example example.c)
+    target_link_libraries(example ${LUPNG_LIBRARIES})
 endif(LUPNG_BUILD_EXAMPLE)
