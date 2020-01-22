@@ -753,20 +753,26 @@ static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
 
     info->userCtx->readProc((void *)&chunk->length, 4, 1, info->userCtx->readProcUserPtr);
     chunk->length = swap32(chunk->length);
+    if (chunk->length+4 < chunk->length)
+    {
+        LUPNG_WARN(info, "PNG: chunk claims to be absurdly large");
+        info->userCtx->freeProc(chunk, info->userCtx->freeProcUserPtr);
+        return NULL;
+    }
+
     // Store chunk type and contents in the same buffer for convenience
     chunk->type = (uint8_t *)info->userCtx->allocProc(chunk->length + 4, info->userCtx->allocProcUserPtr);
+    if (!chunk->type)
+    {
+        LUPNG_WARN(info,"PNG: memory allocation failed!");
+        info->userCtx->freeProc(chunk, info->userCtx->freeProcUserPtr);
+        return NULL;
+    }
     chunk->data = chunk->type + 4;
-
     info->userCtx->readProc((void *)chunk->type, 1, chunk->length + 4, info->userCtx->readProcUserPtr);
     read = info->userCtx->readProc((void *)&chunk->crc, 4, 1, info->userCtx->readProcUserPtr);
     chunk->crc = swap32(chunk->crc);
 
-    if (chunk->length+4 < chunk->length)
-    {
-        LUPNG_WARN(info, "PNG: chunk claims to be absurdly large");
-        releaseChunk(chunk, info->userCtx);
-        return NULL;
-    }
     for (int i = 0; i < 4; ++i)
     {
         char byte = chunk->type[i];
@@ -786,7 +792,7 @@ static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
 
     if (crc(chunk->type, chunk->length+4) != chunk->crc)
     {
-        LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\'", (char *)chunk->type);
+        LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\' chunk", (char *)chunk->type);
         releaseChunk(chunk, info->userCtx);
         return NULL;
     }
