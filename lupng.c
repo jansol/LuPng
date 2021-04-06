@@ -765,7 +765,6 @@ static LU_INLINE int readChunk(PngInfoStruct *info, PngChunk *chunk)
 
     // Store chunk type and contents and crc in the same buffer for convenience
     chunk->type = (uint8_t *)info->userCtx->allocProc(chunk->length + 8, info->userCtx->allocProcUserPtr);
-    chunk->data = chunk->type + 4;
     if (!chunk->type)
     {
         LUPNG_WARN(info, "PNG: memory allocation failed!");
@@ -773,6 +772,8 @@ static LU_INLINE int readChunk(PngInfoStruct *info, PngChunk *chunk)
     }
 
     memcpy(chunk->type, &ch.type, 4);
+    chunk->data = chunk->type + 4;
+
     if (!info->userCtx->readProc(chunk->data, chunk->length + 4, 1, info->userCtx->readProcUserPtr))
     {
         LUPNG_WARN(info, "PNG: read error");
@@ -780,7 +781,7 @@ static LU_INLINE int readChunk(PngInfoStruct *info, PngChunk *chunk)
         return PNG_ERROR;
     }
 
-    chunk->crc = swap32(*((uint32_t *)(chunk->type + 4 + chunk->length)));
+    chunk->crc = swap32(*((uint32_t *)(chunk->data + chunk->length)));
     if (crc(chunk->type, chunk->length + 4) != chunk->crc)
     {
         LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\' chunk", (char *)chunk->type);
