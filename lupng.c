@@ -829,7 +829,6 @@ static LU_INLINE int handleChunk(PngInfoStruct *info, PngChunk *chunk)
 
 LuImage *luPngReadUC(const LuUserContext *userCtx)
 {
-
     uint8_t signature[PNG_SIG_SIZE];
     int status = PNG_ERROR;
 
@@ -839,24 +838,23 @@ LuImage *luPngReadUC(const LuUserContext *userCtx)
 
     if (!userCtx->skipSig)
     {
-        info.userCtx->readProc((void *)signature, 1, PNG_SIG_SIZE, info.userCtx->readProcUserPtr);
-        status = bytesEqual(signature, PNG_SIG, PNG_SIG_SIZE) ? PNG_OK : PNG_ERROR;
-    }
-
-    if (status == PNG_OK)
-    {
-        PngChunk *chunk;
-        while ((chunk = readChunk(&info)))
+        if (!userCtx->readProc((void*)signature, PNG_SIG_SIZE, 1, userCtx->readProcUserPtr)
+            || !bytesEqual(signature, PNG_SIG, PNG_SIG_SIZE))
         {
-            status = handleChunk(&info, chunk);
-            releaseChunk(chunk, info.userCtx);
-
-            if (status != PNG_OK)
-                break;
+            LUPNG_WARN(&info, "PNG: invalid header");
+            return NULL;
         }
     }
-    else
-        LUPNG_WARN(&info, "PNG: invalid header");
+
+    PngChunk *chunk;
+    while ((chunk = readChunk(&info)))
+    {
+        status = handleChunk(&info, chunk);
+        releaseChunk(chunk, info.userCtx);
+
+        if (status != PNG_OK)
+            break;
+    }
 
     userCtx->freeProc(info.currentScanline, userCtx->freeProcUserPtr);
     userCtx->freeProc(info.previousScanline, userCtx->freeProcUserPtr);
