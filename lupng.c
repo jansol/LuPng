@@ -221,13 +221,6 @@ static const int colIncrement[] = { 1, 8, 8, 4, 4, 2, 2, 1 };
  * Helper functions
  ********************************************************/
 
-static LU_INLINE void releaseChunk(PngChunk *chunk, const LuUserContext *userCtx)
-{
-    /* Only release chunk->type since chunk->data points to the same memory. */
-    userCtx->freeProc(chunk->type, userCtx->freeProcUserPtr);
-    userCtx->freeProc(chunk, userCtx->freeProcUserPtr);
-}
-
 static LU_INLINE uint32_t swap32(uint32_t n)
 {
     union {
@@ -741,63 +734,61 @@ static LU_INLINE int parseIdat(PngInfoStruct *info, PngChunk *chunk)
     return PNG_OK;
 }
 
-static LU_INLINE PngChunk *readChunk(PngInfoStruct *info)
+static LU_INLINE int readChunk(PngInfoStruct *info, PngChunk *chunk)
 {
-    PngChunk *chunk = (PngChunk *)info->userCtx->allocProc(sizeof(PngChunk),info->userCtx->allocProcUserPtr);
-    size_t read = 0;
-    if (!chunk)
+    struct {
+        uint32_t length;
+        uint8_t type[4];
+    } ch;
+
+    if (!info->userCtx->readProc((void *)&ch, sizeof(ch), 1, info->userCtx->readProcUserPtr))
     {
-        LUPNG_WARN(info,"PNG: memory allocation failed!");
-        return NULL;
+        LUPNG_WARN(info, "PNG: read error");
+        return PNG_ERROR;
     }
 
-    info->userCtx->readProc((void *)&chunk->length, 4, 1, info->userCtx->readProcUserPtr);
-    chunk->length = swap32(chunk->length);
-    if (chunk->length+4 < chunk->length)
+    chunk->length = swap32(ch.length);
+    if (chunk->length >= INT32_MAX)
     {
         LUPNG_WARN(info, "PNG: chunk claims to be absurdly large");
-        info->userCtx->freeProc(chunk, info->userCtx->freeProcUserPtr);
-        return NULL;
+        return PNG_ERROR;
     }
-
-    // Store chunk type and contents in the same buffer for convenience
-    chunk->type = (uint8_t *)info->userCtx->allocProc(chunk->length + 4, info->userCtx->allocProcUserPtr);
-    if (!chunk->type)
-    {
-        LUPNG_WARN(info,"PNG: memory allocation failed!");
-        info->userCtx->freeProc(chunk, info->userCtx->freeProcUserPtr);
-        return NULL;
-    }
-    chunk->data = chunk->type + 4;
-    info->userCtx->readProc((void *)chunk->type, 1, chunk->length + 4, info->userCtx->readProcUserPtr);
-    read = info->userCtx->readProc((void *)&chunk->crc, 4, 1, info->userCtx->readProcUserPtr);
-    chunk->crc = swap32(chunk->crc);
 
     for (int i = 0; i < 4; ++i)
     {
-        char byte = chunk->type[i];
-        if ((byte < 'a' || byte > 'z') && (byte < 'A' || byte > 'Z'))
+        if ((ch.type[i] < 'a' || ch.type[i] > 'z') && (ch.type[i] < 'A' || ch.type[i] > 'Z'))
         {
             LUPNG_WARN(info, "PNG: invalid chunk name, possibly unprintable");
-            releaseChunk(chunk, info->userCtx);
-            return NULL;
+            return PNG_ERROR;
         }
     }
-    if (read != 1)
+
+    // Store chunk type and contents and crc in the same buffer for convenience
+    chunk->type = (uint8_t *)info->userCtx->allocProc(chunk->length + 8, info->userCtx->allocProcUserPtr);
+    chunk->data = chunk->type + 4;
+    if (!chunk->type)
+    {
+        LUPNG_WARN(info, "PNG: memory allocation failed!");
+        return PNG_ERROR;
+    }
+
+    memcpy(chunk->type, &ch.type, 4);
+    if (!info->userCtx->readProc(chunk->data, chunk->length + 4, 1, info->userCtx->readProcUserPtr))
     {
         LUPNG_WARN(info, "PNG: read error");
-        releaseChunk(chunk, info->userCtx);
-        return NULL;
+        info->userCtx->freeProc(chunk->type, info->userCtx->freeProcUserPtr);
+        return PNG_ERROR;
     }
 
-    if (crc(chunk->type, chunk->length+4) != chunk->crc)
+    chunk->crc = swap32(*((uint32_t *)(chunk->type + 4 + chunk->length)));
+    if (crc(chunk->type, chunk->length + 4) != chunk->crc)
     {
         LUPNG_WARN(info, "PNG: CRC mismatch in \'%.4s\' chunk", (char *)chunk->type);
-        releaseChunk(chunk, info->userCtx);
-        return NULL;
+        info->userCtx->freeProc(chunk->type, info->userCtx->freeProcUserPtr);
+        return PNG_ERROR;
     }
 
-    return chunk;
+    return PNG_OK;
 }
 
 static LU_INLINE int handleChunk(PngInfoStruct *info, PngChunk *chunk)
@@ -845,11 +836,11 @@ LuImage *luPngReadUC(const LuUserContext *userCtx)
 
     if (status == PNG_OK)
     {
-        PngChunk *chunk;
-        while ((chunk = readChunk(&info)))
+        PngChunk chunk;
+        while (readChunk(&info, &chunk) == PNG_OK)
         {
-            status = handleChunk(&info, chunk);
-            releaseChunk(chunk, info.userCtx);
+            status = handleChunk(&info, &chunk);
+            userCtx->freeProc(chunk.type, userCtx->freeProcUserPtr);
 
             if (status != PNG_OK)
                 break;
