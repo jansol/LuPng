@@ -19,9 +19,8 @@ With zlib:
 With miniz:
   - add lupng.c and miniz.c to your project
   - add a miniz header to your include path (there is one provided in the miniz/ directory)
-  - Example: `cc example.c lupng.c miniz/miniz.c -Iminiz/`
+  - Example: `cc example.c lupng.c -Iminiz/`
 
 License
 -------
-LuPng is licensed under the MIT license. See the file LICENSE for details.
-Miniz is placed in the public domain by its author, Rich Geldreich.
+LuPng and miniz are licensed under the MIT license. See the files LICENSE and miniz/LICENSE respectively for details.

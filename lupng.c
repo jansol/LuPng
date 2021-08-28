@@ -28,7 +28,7 @@
 #include <string.h>
 
 #ifndef LUPNG_USE_ZLIB
-#include <miniz.h>
+#include "miniz.h"
 #else
 #include <zlib.h>
 #endif
