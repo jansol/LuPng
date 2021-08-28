@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -29,15 +29,15 @@ extern "C" {
 #pragma once
 
 #if defined(_MSC_VER) && (_MSC_VER < 1600)
-typedef __int8  int8_t;
+typedef __int8 int8_t;
 typedef __int16 int16_t;
 typedef __int32 int32_t;
 typedef unsigned __int8 uint8_t;
 typedef unsigned __int16 uint16_t;
 typedef unsigned __int32 uint32_t;
 #else
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 #endif
 
 typedef struct {
@@ -49,11 +49,13 @@ typedef struct {
     uint8_t *data;
 } LuImage;
 
-typedef size_t (*PngReadProc)(void *outPtr, size_t size, size_t count, void *userPtr);
-typedef size_t (*PngWriteProc)(const void *inPtr, size_t size, size_t count, void *userPtr);
-typedef void*  (*PngAllocProc)(size_t size, void *userPtr);
-typedef void   (*PngFreeProc)(void *ptr, void *userPtr);
-typedef void   (*PngWarnProc)(void *userPtr, const char *fmt, ...);
+typedef size_t (*PngReadProc)(void *outPtr, size_t size, size_t count,
+                              void *userPtr);
+typedef size_t (*PngWriteProc)(const void *inPtr, size_t size, size_t count,
+                               void *userPtr);
+typedef void *(*PngAllocProc)(size_t size, void *userPtr);
+typedef void (*PngFreeProc)(void *ptr, void *userPtr);
+typedef void (*PngWarnProc)(void *userPtr, const char *fmt, ...);
 
 typedef struct {
     /* loader */
@@ -93,14 +95,15 @@ void luUserContextInitDefault(LuUserContext *userCtx);
  * The data store of the Image is allocated but its contents are undefined.
  * Only 8 and 16 bits deep images with 1-4 channels are supported.
  *
- * @param buffer pointer to an existing buffer (which may already contain the
- *               image data), or NULL to internally allocate a new buffer
+ * @param buffer pointer to an existing buffer (which may already contain
+ * the image data), or NULL to internally allocate a new buffer
  * @param userCtx the user context (with the memory allocator function
  *                pointers to use), or NULL to use the default allocator
  *                (malloc).
  */
-LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t depth,
-                       uint8_t *buffer, const LuUserContext *usrCtx);
+LuImage *luImageCreate(size_t width, size_t height, uint8_t channels,
+                       uint8_t depth, uint8_t *buffer,
+                       const LuUserContext *usrCtx);
 
 /**
  * Releases the memory associated with the given Image object.
@@ -113,7 +116,7 @@ LuImage *luImageCreate(size_t width, size_t height, uint8_t channels, uint8_t de
 void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
 
 /**
- * Extracts the raw image buffer form a LuImage and releases the 
+ * Extracts the raw image buffer form a LuImage and releases the
  * then-orphaned LuImage object. This can be used if you want to use
  * the image data in your own structures.
  *
@@ -122,7 +125,8 @@ void luImageRelease(LuImage *img, const LuUserContext *usrCtx);
  *                (free). The deallocator should match the ones used for
  *                allocation.
  */
-uint8_t *luImageExtractBufAndRelease(LuImage *img, const LuUserContext *userCtx);
+uint8_t *luImageExtractBufAndRelease(LuImage *img,
+                                     const LuUserContext *userCtx);
 
 /**
  * Decodes a PNG image from a file
@@ -159,11 +163,11 @@ LuImage *luPngReadUC(const LuUserContext *userCtx);
 int luPngWriteFile(const char *filename, const LuImage *img);
 
 /**
- * Encodes a LuImage struct to PNG and writes it out using a user-defined write
- * function.
+ * Encodes a LuImage struct to PNG and writes it out using a user-defined
+ * write function.
  *
- * @param writeProc a function pointer to a user-defined function that will be
- * used for writing the final PNG data.
+ * @param writeProc a function pointer to a user-defined function that will
+ * be used for writing the final PNG data.
  * @param userPtr an opaque pointer provided as an argument to writeProc
  * @param img the LuImage to encode
  */
